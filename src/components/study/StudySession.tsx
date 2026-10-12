@@ -223,20 +223,29 @@ export const StudySession: React.FC<StudySessionProps> = ({
     if (!isRemembered) {
       // Mark as unresolved forgotten card
       setForgottenCardIds(prev => new Set(prev).add(currentCardId));
-      // Re-insert card further in session queue so user gets another attempt
-      if (currentIndex + 4 < nextQueue.length) {
-        nextQueue.splice(currentIndex + 4, 0, currentCard);
-      } else {
-        nextQueue.push(currentCard);
+      
+      // Prevent duplicate instances: check if card is already waiting ahead in the remaining queue
+      const alreadyWaitingAhead = nextQueue.slice(currentIndex + 1).some(c => c.id === currentCardId);
+      if (!alreadyWaitingAhead) {
+        if (currentIndex + 4 < nextQueue.length) {
+          nextQueue.splice(currentIndex + 4, 0, currentCard);
+        } else {
+          nextQueue.push(currentCard);
+        }
       }
     } else {
-      // Successfully remembered: remove from unresolved forgotten set
+      // Successfully remembered:
+      // 1. Remove from unresolved forgotten set
       setForgottenCardIds(prev => {
         if (!prev.has(currentCardId)) return prev;
         const next = new Set(prev);
         next.delete(currentCardId);
         return next;
       });
+
+      // 2. Remove ANY future remaining copies of this card from the queue!
+      // Once remembered, the card is mastered for this session. User NEVER has to click 'Вспомнил' repeatedly!
+      nextQueue = nextQueue.filter((c, idx) => idx <= currentIndex || c.id !== currentCardId);
     }
 
     setQueue(nextQueue);

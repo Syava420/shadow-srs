@@ -3,10 +3,11 @@ import { FlashCard } from '@/types';
 
 // Instantiate FSRS engine with optimal parameters
 // enable_short_term: false removes annoying intraday 10-minute traps so cards graduate directly to >= 1 day
+// enable_fuzz: false ensures deterministic, stable intervals without random day jumping
 const f = fsrs({
   request_retention: 0.9, // Target 90% retention rate
   maximum_interval: 36500, // Up to 100 years
-  enable_fuzz: true,      // Slight random fuzz to prevent cards piling up on same day
+  enable_fuzz: false,     // Deterministic intervals without random jumping
   enable_short_term: false, // Cards sleep until tomorrow or future days after daily session
 });
 
@@ -123,11 +124,11 @@ export function getNextIntervalText(card: FlashCard, isRemembered: boolean): str
   if (!isRemembered) return 'В этой сессии';
   try {
     const now = new Date();
-    const currentFSRSCard: FSRSCard = {
+    const currentFSRSCard: FSRSCard = card.fsrsCard ? {
       ...card.fsrsCard,
       due: new Date(card.fsrsCard.due),
       last_review: card.fsrsCard.last_review ? new Date(card.fsrsCard.last_review) : undefined,
-    };
+    } : createNewFSRSCard();
     const nextCard = f.repeat(currentFSRSCard, now)[Rating.Good].card;
     const diffMs = new Date(nextCard.due).getTime() - now.getTime();
     

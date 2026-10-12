@@ -60,8 +60,8 @@ export const StudyControls: React.FC<StudyControlsProps> = ({
           <XCircle className="w-4 h-4" />
           <span>Забыл</span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-600 group-hover:text-zinc-500">
-          {forgotInterval}
+        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400">
+          Повтор: {forgotInterval.toLowerCase()}
         </span>
       </button>
 
@@ -74,8 +74,8 @@ export const StudyControls: React.FC<StudyControlsProps> = ({
           <CheckCircle2 className="w-4 h-4" />
           <span>Вспомнил</span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-600 group-hover:text-zinc-500">
-          {rememberedInterval}
+        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400">
+          Повтор: {rememberedInterval.startsWith('Завтра') ? 'Завтра' : `через ${rememberedInterval}`}
         </span>
       </button>
     </div>
