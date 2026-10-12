@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Volume2, RotateCcw } from 'lucide-react';
+import { Volume2, RotateCcw, Pencil } from 'lucide-react';
 import { FlashCard as FlashCardType } from '@/types';
 import { tts } from '@/lib/tts';
 
@@ -13,6 +13,7 @@ interface FlashCardProps {
   isFlipped: boolean;
   onFlip: () => void;
   onRate: (isRemembered: boolean) => void;
+  onEdit: () => void;
   showImages: boolean;
   voiceAccent: 'en-US' | 'en-GB';
   speechRate: number;
@@ -24,6 +25,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   isFlipped,
   onFlip,
   onRate,
+  onEdit,
   showImages,
   voiceAccent,
   speechRate,
@@ -33,6 +35,29 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   const [dragOffset, setDragOffset] = useState<number>(0);
   const isDragging = useRef(false);
   const lastTouchEndRef = useRef<number>(0);
+
+  // Long-press detection (450ms) to trigger edit modal
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressActiveRef = useRef(false);
+
+  const startLongPress = () => {
+    isLongPressActiveRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressActiveRef.current = true;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      onEdit();
+    }, 450);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   // Decide front/back text based on direction
   const isRuToEn = direction === 'ru_to_en';
@@ -44,22 +69,39 @@ export const FlashCard: React.FC<FlashCardProps> = ({
     tts.speak(card.back, { accent: voiceAccent, rate: speechRate });
   };
 
-  // Touch Gesture Handlers (Mobile Swipe)
+  // Touch Gesture Handlers (Mobile Swipe & Long Press)
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     setTouchStartX(touch.clientX);
     setTouchStartY(touch.clientY);
     isDragging.current = true;
+    startLongPress();
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging.current || touchStartX === null) return;
+    if (!isDragging.current || touchStartX === null || touchStartY === null) return;
     const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
     const diffX = currentX - touchStartX;
+    const diffY = currentY - touchStartY;
+
+    if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+      cancelLongPress();
+    }
     setDragOffset(diffX);
   };
 
   const handleTouchEnd = () => {
+    cancelLongPress();
+    if (isLongPressActiveRef.current) {
+      isLongPressActiveRef.current = false;
+      isDragging.current = false;
+      setDragOffset(0);
+      setTouchStartX(null);
+      setTouchStartY(null);
+      return;
+    }
+
     if (!isDragging.current) return;
     isDragging.current = false;
     lastTouchEndRef.current = Date.now();
@@ -78,6 +120,10 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressActiveRef.current) {
+      isLongPressActiveRef.current = false;
+      return;
+    }
     if (Date.now() - lastTouchEndRef.current < 450) {
       return;
     }
@@ -95,6 +141,9 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   return (
     <div
       onClick={handleClick}
+      onMouseDown={startLongPress}
+      onMouseUp={cancelLongPress}
+      onMouseLeave={cancelLongPress}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -134,6 +183,17 @@ export const FlashCard: React.FC<FlashCardProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  onEdit();
+                }}
+                className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer border border-zinc-800"
+                title="Редактировать карточку (удерживание)"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   onFlip();
                 }}
                 className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer border border-zinc-800"
@@ -152,7 +212,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
           </div>
 
           <div className="text-[11px] font-mono text-zinc-600">
-            клик для переворота
+            клик — переворот · удерживание — ред.
           </div>
         </div>
 
@@ -174,16 +234,30 @@ export const FlashCard: React.FC<FlashCardProps> = ({
               <RotateCcw className="w-4 h-4" />
             </button>
 
-            {isRuToEn && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleReplayAudio}
-                className="p-2.5 rounded-full bg-zinc-850 hover:bg-zinc-750 text-zinc-200 border border-zinc-700/60 shadow-md cursor-pointer transition-colors"
-                title="Повторить озвучку (R)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer border border-zinc-800"
+                title="Редактировать карточку (удерживание)"
               >
-                <Volume2 className="w-5 h-5 text-zinc-300" />
+                <Pencil className="w-4 h-4" />
               </button>
-            )}
+
+              {isRuToEn && (
+                <button
+                  type="button"
+                  onClick={handleReplayAudio}
+                  className="p-2.5 rounded-full bg-zinc-850 hover:bg-zinc-750 text-zinc-200 border border-zinc-700/60 shadow-md cursor-pointer transition-colors"
+                  title="Повторить озвучку (R)"
+                >
+                  <Volume2 className="w-5 h-5 text-zinc-300" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Centered Answer Text + Art */}

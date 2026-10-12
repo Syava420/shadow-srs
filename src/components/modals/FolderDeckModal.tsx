@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Folder, Layers } from 'lucide-react';
+import { X, Check, Folder, Layers, Trash2 } from 'lucide-react';
 import { Folder as FolderType } from '@/types';
 
 interface FolderDeckModalProps {
@@ -15,6 +15,7 @@ interface FolderDeckModalProps {
   onCreateDeck: (name: string, description: string, folderId?: string) => void;
   onUpdateFolder?: (id: string, name: string) => void;
   onUpdateDeck?: (id: string, name: string, description: string, folderId?: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const FolderDeckModal: React.FC<FolderDeckModalProps> = ({
@@ -28,6 +29,7 @@ export const FolderDeckModal: React.FC<FolderDeckModalProps> = ({
   onCreateDeck,
   onUpdateFolder,
   onUpdateDeck,
+  onDelete,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -144,26 +146,45 @@ export const FolderDeckModal: React.FC<FolderDeckModalProps> = ({
             </>
           )}
 
-          <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors cursor-pointer"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer shadow-md ${
-                !name.trim()
-                  ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950'
-              }`}
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>{isEditing ? 'Сохранить' : 'Создать'}</span>
-            </button>
+          <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between">
+            {isEditing && editingItem && onDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const itemTitle = mode === 'folder' ? `папку "${editingItem.name}"` : `колоду "${editingItem.name}"`;
+                  if (confirm(`Точно удалить ${itemTitle}?`)) {
+                    onDelete(editingItem.id);
+                    onClose();
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-500 hover:text-red-400 hover:bg-red-950/20 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Удалить {mode === 'folder' ? 'папку' : 'колоду'}</span>
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={!name.trim()}
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer shadow-md ${
+                  !name.trim()
+                    ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                    : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>{isEditing ? 'Сохранить' : 'Создать'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -15,7 +15,8 @@ import {
   Layers,
   ArrowUpDown,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Pencil
 } from 'lucide-react';
 
 interface DeckViewProps {
@@ -28,6 +29,8 @@ interface DeckViewProps {
   onAddCard: (deckId: string) => void;
   onEditCard: (card: FlashCard) => void;
   onDeleteCard: (cardId: string) => void;
+  onEditDeck?: (deck: Deck) => void;
+  onDeleteDeck?: (deckId: string) => void;
 }
 
 type SortOption = 'due_first' | 'mastery_asc' | 'mastery_desc' | 'time_spent' | 'newest' | 'alphabetical';
@@ -42,6 +45,8 @@ export const DeckView: React.FC<DeckViewProps> = ({
   onAddCard,
   onEditCard,
   onDeleteCard,
+  onEditDeck,
+  onDeleteDeck,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('due_first');
@@ -108,7 +113,31 @@ export const DeckView: React.FC<DeckViewProps> = ({
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-xs uppercase tracking-wider text-zinc-500 font-medium">Колода</span>
             </div>
-            <h2 className="text-xl md:text-2xl font-bold text-zinc-200">{deck.name}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl md:text-2xl font-bold text-zinc-200">{deck.name}</h2>
+              {onEditDeck && (
+                <button
+                  onClick={() => onEditDeck(deck)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Редактировать / переместить в папку"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+              {onDeleteDeck && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Удалить колоду "${deck.name}" и все её карточки?`)) {
+                      onDeleteDeck(deck.id);
+                    }
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Удалить колоду"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             {deck.description && (
               <p className="text-xs md:text-sm text-zinc-400 mt-1">{deck.description}</p>
             )}
@@ -275,36 +304,32 @@ export const DeckView: React.FC<DeckViewProps> = ({
                     style={{ width: `${mastery}%` }}
                   />
 
-                  <div className="flex items-center gap-3.5 flex-1 min-w-0 z-10">
-                    {/* Visual Art/Photo Thumbnail */}
-                    {card.imageUrl ? (
-                      <div className="w-14 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-900 border border-zinc-800/80 shadow-inner">
+                  <div className="flex items-center gap-3 flex-1 min-w-0 z-10">
+                    {/* Visual Art/Photo Thumbnail (Only if image exists) */}
+                    {card.imageUrl && (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-900 border border-zinc-800 shadow-inner">
                         <img
                           src={card.imageUrl}
                           alt=""
                           className="w-full h-full object-cover"
                         />
                       </div>
-                    ) : (
-                      <div className="w-14 h-11 rounded-lg flex-shrink-0 bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 text-xs">
-                        🖼️
-                      </div>
                     )}
 
-                    {/* Bilingual Texts */}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-zinc-400 truncate mb-0.5">
+                    {/* Bilingual Texts - Spacious and Readable */}
+                    <div className="min-w-0 flex-1 pr-1">
+                      <div className="text-xs text-zinc-400 line-clamp-2 break-words mb-0.5 leading-snug">
                         {card.front}
                       </div>
-                      <div className="text-xs font-semibold text-zinc-200 truncate flex items-center gap-2">
-                        <span>{card.back}</span>
+                      <div className="text-xs sm:text-sm font-semibold text-zinc-100 break-words flex items-start gap-1.5 leading-snug">
+                        <span className="flex-1">{card.back}</span>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             tts.speak(card.back);
                           }}
-                          className="text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer"
+                          className="text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer flex-shrink-0 mt-0.5"
                           title="Прослушать произношение"
                         >
                           <Volume2 className="w-3.5 h-3.5" />
@@ -314,61 +339,66 @@ export const DeckView: React.FC<DeckViewProps> = ({
                   </div>
 
                   {/* Status, Time & Actions */}
-                  <div className="flex items-center gap-3 flex-shrink-0 z-10">
-                    {/* Time spent */}
-                    <div className="hidden sm:flex items-center gap-1 text-[11px] text-zinc-500 font-mono" title="Потрачено времени на эту карту">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 z-10">
+                    {/* Time spent (desktop only) */}
+                    <div className="hidden md:flex items-center gap-1 text-[11px] text-zinc-500 font-mono" title="Потрачено времени на эту карту">
                       <Clock className="w-3 h-3 text-zinc-600" />
                       <span>{formatSpentTime(card.timeSpentSeconds)}</span>
                     </div>
 
-                    {/* Mastery % Badge */}
-                    <div
-                      className={`text-[11px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
-                        mastery >= 90
-                          ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-400 font-semibold'
-                          : mastery > 0
-                          ? 'bg-zinc-850 border-zinc-700/60 text-zinc-300'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-500'
-                      }`}
-                      title={mastery >= 90 ? 'Закреплено в долговременной памяти' : 'В процессе освоения'}
-                    >
-                      {mastery >= 90 && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                      <span>{mastery}%</span>
-                    </div>
-
-                    {/* Due Badge */}
+                    {/* Due Badge (desktop only) */}
                     {isDue && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">
+                      <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">
                         Повторить
                       </span>
                     )}
 
-                    {/* Action buttons */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditCard(card);
-                      }}
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
-                      title="Настройки карточки"
+                    {/* Mastery % Badge */}
+                    <div
+                      className={`text-[11px] font-mono px-2 py-0.5 rounded border flex items-center gap-1.5 ${
+                        mastery >= 90
+                          ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-400 font-semibold'
+                          : isDue
+                          ? 'bg-amber-950/40 border-amber-800/40 text-amber-300 font-medium'
+                          : mastery > 0
+                          ? 'bg-zinc-850 border-zinc-700/60 text-zinc-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                      }`}
+                      title={isDue ? 'Требует повторения сегодня' : `${mastery}% усвоения`}
                     >
-                      <Settings2 className="w-3.5 h-3.5" />
-                    </button>
+                      {isDue && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 sm:hidden animate-pulse" />}
+                      {mastery >= 90 && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                      <span>{mastery}%</span>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Удалить карточку "${card.back}"?`)) {
-                          onDeleteCard(card.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
-                      title="Удалить карточку"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Action buttons (desktop/tablet only, on phone tap card to edit) */}
+                    <div className="hidden sm:flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditCard(card);
+                        }}
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                        title="Настройки карточки"
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Удалить карточку "${card.back}"?`)) {
+                            onDeleteCard(card.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                        title="Удалить карточку"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

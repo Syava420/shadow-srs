@@ -8,7 +8,8 @@ import { tts } from '@/lib/tts';
 import { FlashCard, CardDirection } from './FlashCard';
 import { StudyControls } from './StudyControls';
 import { StudySummary } from './StudySummary';
-import { X } from 'lucide-react';
+import { CardEditModal } from '@/components/modals/CardEditModal';
+import { X, Pencil } from 'lucide-react';
 
 export type { DirectionMode };
 
@@ -18,6 +19,7 @@ interface StudySessionProps {
   directionMode?: DirectionMode;
   cardLimit?: number;
   onUpdateCard: (updatedCard: FlashCardType) => void;
+  onDeleteCard?: (cardId: string) => void;
   onExit: () => void;
 }
 
@@ -42,6 +44,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   directionMode = 'adaptive',
   cardLimit,
   onUpdateCard,
+  onDeleteCard,
   onExit,
 }) => {
   const initialQueue = useMemo(() => {
@@ -61,6 +64,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isEditingCard, setIsEditingCard] = useState(false);
 
   // Multi-step repetition logic for forgotten cards
   const [repsNeeded, setRepsNeeded] = useState<Record<string, number>>({});
@@ -202,13 +206,23 @@ export const StudySession: React.FC<StudySessionProps> = ({
     <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none overflow-hidden">
       {/* Top Ultra-Minimal Bar */}
       <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-4">
-        <button
-          onClick={onExit}
-          className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
-          title="Завершить тренировку (Esc)"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onExit}
+            className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
+            title="Завершить тренировку (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setIsEditingCard(true)}
+            className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
+            title="Редактировать карточку (удерживание)"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Minimal Progress Line */}
         <div className="flex-1 max-w-md mx-4">
@@ -234,6 +248,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onRate={handleRate}
+          onEdit={() => setIsEditingCard(true)}
           showImages={settings.showImages}
           voiceAccent={settings.voiceAccent}
           speechRate={settings.speechRate}
@@ -250,6 +265,30 @@ export const StudySession: React.FC<StudySessionProps> = ({
           onReplayAudio={handleReplayAudio}
         />
       </div>
+
+      {/* Modal for In-Session Card Editing */}
+      {currentCard && (
+        <CardEditModal
+          isOpen={isEditingCard}
+          deckId={currentCard.deckId}
+          cardToEdit={currentCard}
+          onClose={() => setIsEditingCard(false)}
+          onSaveCard={(savedCard) => {
+            onUpdateCard(savedCard);
+            setQueue(prev => prev.map(c => c.id === savedCard.id ? savedCard : c));
+            setIsEditingCard(false);
+          }}
+          onDeleteCard={(cardId) => {
+            if (onDeleteCard) onDeleteCard(cardId);
+            const nextQueue = queue.filter(c => c.id !== cardId);
+            setQueue(nextQueue);
+            setIsEditingCard(false);
+            if (nextQueue.length === 0 || currentIndex >= nextQueue.length) {
+              setIsFinished(true);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

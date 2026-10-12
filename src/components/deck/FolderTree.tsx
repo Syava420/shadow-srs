@@ -11,7 +11,8 @@ import {
   ChevronDown, 
   Layers, 
   Trash2, 
-  Pencil 
+  Pencil,
+  X 
 } from 'lucide-react';
 
 interface FolderTreeProps {
@@ -26,6 +27,7 @@ interface FolderTreeProps {
   onEditDeck: (deck: DeckType) => void;
   onDeleteDeck: (deckId: string) => void;
   onDeleteFolder: (folderId: string) => void;
+  onClose?: () => void;
 }
 
 export const FolderTree: React.FC<FolderTreeProps> = ({
@@ -40,6 +42,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   onEditDeck,
   onDeleteDeck,
   onDeleteFolder,
+  onClose,
 }) => {
   const [openFolderIds, setOpenFolderIds] = useState<Record<string, boolean>>({
     'folder-demo-1': true,
@@ -66,30 +69,48 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   });
 
   return (
-    <aside className="fixed md:static top-16 bottom-0 left-0 z-20 w-72 max-w-[85vw] bg-[#09090b] border-r border-zinc-800/80 flex flex-col h-[calc(100vh-4rem)] shadow-2xl md:shadow-none select-none">
-      <div className="p-4 border-b border-zinc-800/60 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-          Колоды & Папки
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onCreateFolder()}
-            title="Создать папку"
-            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors text-xs flex items-center gap-1 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Папка</span>
-          </button>
-          <button
-            onClick={() => onCreateDeck()}
-            title="Создать колоду"
-            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors text-xs flex items-center gap-1 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Колода</span>
-          </button>
+    <>
+      {/* Mobile Backdrop */}
+      {onClose && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 top-16 bg-black/70 backdrop-blur-xs z-15 md:hidden"
+        />
+      )}
+
+      <aside className="fixed md:static top-16 bottom-0 left-0 z-20 w-72 max-w-[85vw] bg-[#09090b] border-r border-zinc-800/80 flex flex-col h-[calc(100vh-4rem)] shadow-2xl md:shadow-none select-none">
+        <div className="p-4 border-b border-zinc-800/60 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Колоды & Папки
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onCreateFolder()}
+              title="Создать папку"
+              className="p-1 px-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Папка</span>
+            </button>
+            <button
+              onClick={() => onCreateDeck()}
+              title="Создать колоду"
+              className="p-1 px-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Колода</span>
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 md:hidden ml-1"
+                title="Закрыть панель"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {/* Render Folders */}
@@ -123,20 +144,20 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                   <span className="truncate">{folder.name}</span>
                 </button>
 
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
+                <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
                   <button
                     onClick={() => onCreateDeck(folder.id)}
                     title="Добавить колоду в папку"
-                    className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => onEditFolder(folder)}
                     title="Переименовать папку"
-                    className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
                   >
-                    <Pencil className="w-3 h-3" />
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => {
@@ -145,9 +166,9 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                       }
                     }}
                     title="Удалить папку"
-                    className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-red-400"
+                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-red-400"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -204,10 +225,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                                 e.stopPropagation();
                                 onEditDeck(deck);
                               }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 ml-1"
-                              title="Редактировать колоду"
+                              className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-zinc-400 hover:text-zinc-200 ml-1"
+                              title="Редактировать / переместить колоду"
                             >
-                              <Pencil className="w-3 h-3" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
 
                             <button
@@ -217,10 +238,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                                   onDeleteDeck(deck.id);
                                 }
                               }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 ml-0.5"
+                              className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-zinc-500 hover:text-red-400 ml-0.5"
                               title="Удалить колоду"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
@@ -283,10 +304,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                         e.stopPropagation();
                         onEditDeck(deck);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 ml-1"
-                      title="Редактировать колоду"
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-zinc-400 hover:text-zinc-200 ml-1"
+                      title="Редактировать / переместить колоду"
                     >
-                      <Pencil className="w-3 h-3" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
 
                     <button
@@ -296,10 +317,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                           onDeleteDeck(deck.id);
                         }
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 ml-0.5"
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-zinc-500 hover:text-red-400 ml-0.5"
                       title="Удалить колоду"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -309,5 +330,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
         )}
       </div>
     </aside>
+    </>
   );
 };

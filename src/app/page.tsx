@@ -229,6 +229,7 @@ export default function HomePage() {
         directionMode={studyDirectionMode}
         cardLimit={studyCardLimit}
         onUpdateCard={handleUpdateCardAfterReview}
+        onDeleteCard={handleDeleteCard}
         onExit={() => {
           setActiveStudyDeckId(null);
           refreshData();
@@ -265,6 +266,7 @@ export default function HomePage() {
             decks={decks}
             cards={cards}
             selectedDeckId={selectedDeckId}
+            onClose={() => setIsSidebarOpen(false)}
             onSelectDeck={(id) => {
               setSelectedDeckId(id);
               if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -322,6 +324,12 @@ export default function HomePage() {
               setIsCardEditOpen(true);
             }}
             onDeleteCard={handleDeleteCard}
+            onEditDeck={(deck) => {
+              setFolderDeckMode('deck');
+              setEditingItemForFolderDeck(deck);
+              setIsFolderDeckOpen(true);
+            }}
+            onDeleteDeck={handleDeleteDeck}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500">
@@ -370,6 +378,13 @@ export default function HomePage() {
         onCreateDeck={handleCreateDeck}
         onUpdateFolder={handleUpdateFolder}
         onUpdateDeck={handleUpdateDeck}
+        onDelete={(id) => {
+          if (folderDeckMode === 'folder') {
+            handleDeleteFolder(id);
+          } else {
+            handleDeleteDeck(id);
+          }
+        }}
       />
 
       <StatsModal
