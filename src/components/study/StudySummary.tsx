@@ -7,6 +7,7 @@ import { Trophy, ArrowLeft, RotateCcw } from 'lucide-react';
 interface StudySummaryProps {
   totalReviewed: number;
   rememberedCount: number;
+  timeSpentMinutes?: number;
   onExit: () => void;
   onRestart: () => void;
 }
@@ -14,6 +15,7 @@ interface StudySummaryProps {
 export const StudySummary: React.FC<StudySummaryProps> = ({
   totalReviewed,
   rememberedCount,
+  timeSpentMinutes,
   onExit,
   onRestart,
 }) => {
@@ -41,7 +43,9 @@ export const StudySummary: React.FC<StudySummaryProps> = ({
         Отличная работа!
       </h2>
       <p className="text-sm text-zinc-400 max-w-md mb-8">
-        Все запланированные карточки на сегодня успешно пройдены по алгоритму FSRS.
+        {timeSpentMinutes && timeSpentMinutes > 0
+          ? `Время вышло! Тренировка на ${timeSpentMinutes} минут успешно завершена.`
+          : 'Все запланированные карточки на сегодня успешно пройдены по алгоритму FSRS.'}
       </p>
 
       {/* Metrics */}

@@ -9,7 +9,7 @@ import { FlashCard, CardDirection } from './FlashCard';
 import { StudyControls } from './StudyControls';
 import { StudySummary } from './StudySummary';
 import { CardEditModal } from '@/components/modals/CardEditModal';
-import { X, Pencil } from 'lucide-react';
+import { X, Pencil, Clock } from 'lucide-react';
 
 export type { DirectionMode };
 
@@ -18,6 +18,7 @@ interface StudySessionProps {
   settings: AppSettings;
   directionMode?: DirectionMode;
   cardLimit?: number;
+  sessionDurationMinutes?: number;
   onUpdateCard: (updatedCard: FlashCardType) => void;
   onDeleteCard?: (cardId: string) => void;
   onExit: () => void;
@@ -43,10 +44,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
   settings,
   directionMode = 'adaptive',
   cardLimit,
+  sessionDurationMinutes,
   onUpdateCard,
   onDeleteCard,
   onExit,
 }) => {
+  const durationMins = sessionDurationMinutes !== undefined 
+    ? sessionDurationMinutes 
+    : (settings.sessionDurationMinutes || 0);
+
   const initialQueue = useMemo(() => {
     // 1. Due review cards (already studied, urgent: memories fading right now)
     const dueReviews = cards.filter(isCardDue);
@@ -56,7 +62,11 @@ export const StudySession: React.FC<StudySessionProps> = ({
     // 2. New cards (never studied before)
     const newCards = cards.filter(isCardNew);
 
-    const effectiveLimit = cardLimit !== undefined ? cardLimit : (settings.sessionLimit ?? 20);
+    const effectiveLimit = cardLimit !== undefined 
+      ? cardLimit 
+      : durationMins > 0 
+        ? Math.round(durationMins * 2.5) 
+        : (settings.sessionLimit ?? 20);
 
     // If both reviews and new cards exist: build an interleaved, balanced session
     if (dueReviews.length > 0 && newCards.length > 0) {
@@ -109,6 +119,25 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const [totalReviewed, setTotalReviewed] = useState(0);
   const [rememberedCount, setRememberedCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+
+  // Live session countdown timer
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => durationMins * 60);
+
+  useEffect(() => {
+    if (durationMins <= 0 || isFinished) return;
+
+    const interval = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [durationMins, isFinished]);
 
   const currentCard = queue[currentIndex];
 
@@ -201,14 +230,16 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     setQueue(nextQueue);
 
-    // 5. Advance
-    if (currentIndex + 1 < nextQueue.length) {
+    // 5. Advance or Finish
+    if (durationMins > 0 && secondsRemaining === 0) {
+      setIsFinished(true);
+    } else if (currentIndex + 1 < nextQueue.length) {
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
       setIsFinished(true);
     }
-  }, [currentCard, currentIndex, queue, repsNeeded, onUpdateCard]);
+  }, [currentCard, currentIndex, queue, repsNeeded, onUpdateCard, durationMins, secondsRemaining]);
 
   const handleRestart = () => {
     setQueue([...cards]);
@@ -217,6 +248,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
     setTotalReviewed(0);
     setRememberedCount(0);
     setRepsNeeded({});
+    setSecondsRemaining(durationMins * 60);
     setIsFinished(false);
   };
 
@@ -226,6 +258,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
         <StudySummary
           totalReviewed={totalReviewed}
           rememberedCount={rememberedCount}
+          timeSpentMinutes={durationMins > 0 ? durationMins : undefined}
           onExit={onExit}
           onRestart={handleRestart}
         />
@@ -267,10 +300,27 @@ export const StudySession: React.FC<StudySessionProps> = ({
           </div>
         </div>
 
-        {/* Card Counter Only */}
-        <span className="text-xs font-mono text-zinc-500">
-          {currentIndex + 1} / {queue.length}
-        </span>
+        {/* Timer and Card Counter */}
+        <div className="flex items-center gap-2.5">
+          {durationMins > 0 && (
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
+                secondsRemaining < 60
+                  ? 'bg-amber-950/70 border-amber-800 text-amber-300 animate-pulse'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+              }`}
+              title="Оставшееся время тренировки"
+            >
+              <Clock className="w-3.5 h-3.5 text-zinc-400" />
+              <span>
+                {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')}
+              </span>
+            </div>
+          )}
+          <span className="text-xs font-mono text-zinc-500">
+            {currentIndex + 1} / {queue.length}
+          </span>
+        </div>
       </div>
 
       {/* Main Flashcard Taking Whole Center */}

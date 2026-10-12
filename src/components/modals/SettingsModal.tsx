@@ -136,16 +136,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </p>
             </div>
             <select
-              value={localSettings.sessionLimit ?? 20}
-              onChange={(e) => setLocalSettings({ ...localSettings, sessionLimit: Number(e.target.value) })}
+              value={
+                localSettings.sessionDurationMinutes && localSettings.sessionDurationMinutes > 0
+                  ? `time_${localSettings.sessionDurationMinutes}`
+                  : (localSettings.sessionLimit ?? 20)
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith('time_')) {
+                  const minutes = Number(val.replace('time_', ''));
+                  const estimatedCards = Math.round(minutes * 2.5);
+                  setLocalSettings({ 
+                    ...localSettings, 
+                    sessionDurationMinutes: minutes,
+                    sessionLimit: estimatedCards,
+                  });
+                } else {
+                  const limit = Number(val);
+                  setLocalSettings({ 
+                    ...localSettings, 
+                    sessionDurationMinutes: 0,
+                    sessionLimit: limit,
+                  });
+                }
+              }}
               className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-xl px-3 py-1.5 outline-none font-mono cursor-pointer"
             >
-              <option value={5}>5 карточек (экспресс)</option>
-              <option value={10}>10 карточек</option>
-              <option value={20}>20 карточек (стандарт)</option>
-              <option value={30}>30 карточек</option>
-              <option value={50}>50 карточек</option>
-              <option value={0}>Без лимита (все сразу)</option>
+              <optgroup label="⏱️ По времени (таймер):">
+                <option value="time_5">⚡ 5 минут (~12 карт)</option>
+                <option value="time_10">⏱️ 10 минут (~25 карт)</option>
+                <option value="time_15">⏱️ 15 минут (~35 карт)</option>
+                <option value="time_20">🔥 20 минут (~50 карт)</option>
+              </optgroup>
+              <optgroup label="🎯 По количеству карт:">
+                <option value={5}>5 карточек (экспресс)</option>
+                <option value={10}>10 карточек</option>
+                <option value={20}>20 карточек (стандарт)</option>
+                <option value={30}>30 карточек</option>
+                <option value={50}>50 карточек</option>
+                <option value={0}>Без лимита (все сразу)</option>
+              </optgroup>
             </select>
           </div>
         </div>

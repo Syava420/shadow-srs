@@ -36,6 +36,7 @@ export interface AppSettings {
   showImages: boolean;
   dailyGoal: number; // default 20
   sessionLimit: number; // default 20 (0 = unlimited)
+  sessionDurationMinutes?: number; // 0 = by card count, 5 = 5 min, 10 = 10 min, etc.
 }
 
 export interface ImportPreviewItem {

@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showImages: true,
   dailyGoal: 20,
   sessionLimit: 20,
+  sessionDurationMinutes: 0,
 };
 
 export const DEFAULT_STATS: AppStats = {

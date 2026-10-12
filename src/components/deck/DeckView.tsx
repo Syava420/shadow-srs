@@ -5,20 +5,9 @@ import { Deck, FlashCard, DirectionMode, AppSettings } from '@/types';
 import { calculateDeckStats, isCardDue, isCardNew, calculateMasteryPercent } from '@/lib/fsrs';
 import { tts } from '@/lib/tts';
 import { 
-  Play, 
-  Plus, 
-  Search, 
-  Volume2, 
-  Trash2, 
-  Settings2,
-  Sparkles,
-  Layers,
-  ArrowUpDown,
-  Clock,
-  CheckCircle2,
-  Pencil,
-  Target,
-  SlidersHorizontal
+  Play, Plus, Search, Volume2, Trash2, Settings2,
+  Sparkles, Layers, ArrowUpDown, Clock, CheckCircle2,
+  Pencil, Target, SlidersHorizontal
 } from 'lucide-react';
 import { DeckSimulatorModal } from '@/components/modals/DeckSimulatorModal';
 
@@ -181,22 +170,49 @@ export const DeckView: React.FC<DeckViewProps> = ({
               <option value="en_ru">🇺🇸 → 🇷🇺 Только аудирование</option>
             </select>
 
-            {/* Session Batch Limit Selector */}
+            {/* Session Batch Limit or Duration Selector */}
             <select
-              value={settings.sessionLimit ?? 20}
+              value={
+                settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
+                  ? `time_${settings.sessionDurationMinutes}`
+                  : (settings.sessionLimit ?? 20)
+              }
               onChange={(e) => {
-                const limit = Number(e.target.value);
-                onUpdateSettings({ ...settings, sessionLimit: limit });
+                const val = e.target.value;
+                if (val.startsWith('time_')) {
+                  const minutes = Number(val.replace('time_', ''));
+                  const estimatedCards = Math.round(minutes * 2.5);
+                  onUpdateSettings({ 
+                    ...settings, 
+                    sessionDurationMinutes: minutes,
+                    sessionLimit: estimatedCards,
+                  });
+                } else {
+                  const limit = Number(val);
+                  onUpdateSettings({ 
+                    ...settings, 
+                    sessionDurationMinutes: 0,
+                    sessionLimit: limit,
+                  });
+                }
               }}
               className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 text-xs border border-zinc-800 outline-none cursor-pointer focus:border-zinc-700 transition-colors font-mono"
-              title="Размер порции карточек для одной тренировки"
+              title="Режим тренировки: по времени (таймер) или по количеству карточек"
             >
-              <option value={5}>🎯 Порция: 5 шт. (быстро)</option>
-              <option value={10}>🎯 Порция: 10 шт.</option>
-              <option value={20}>🎯 Порция: 20 шт. (стандарт)</option>
-              <option value={30}>🎯 Порция: 30 шт.</option>
-              <option value={50}>🎯 Порция: 50 шт.</option>
-              <option value={0}>♾️ Без лимита</option>
+              <optgroup label="⏱️ По времени (таймер):">
+                <option value="time_5">⚡ 5 минут (~12 карт)</option>
+                <option value="time_10">⏱️ 10 минут (~25 карт)</option>
+                <option value="time_15">⏱️ 15 минут (~35 карт)</option>
+                <option value="time_20">🔥 20 минут (~50 карт)</option>
+              </optgroup>
+              <optgroup label="🎯 По количеству карт:">
+                <option value={5}>🎯 5 карточек</option>
+                <option value={10}>🎯 10 карточек</option>
+                <option value={20}>🎯 20 карточек (стандарт)</option>
+                <option value={30}>🎯 30 карточек</option>
+                <option value={50}>🎯 50 карточек</option>
+                <option value={0}>♾️ Без лимита</option>
+              </optgroup>
             </select>
 
             {/* Primary Action 2: Study */}
@@ -212,9 +228,11 @@ export const DeckView: React.FC<DeckViewProps> = ({
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>
                 {stats.totalNeedReview > 0 
-                  ? settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
-                    ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
-                    : `Учить (${stats.totalNeedReview} шт.)`
+                  ? settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
+                    ? `Учить (⏱️ ${settings.sessionDurationMinutes} мин)`
+                    : settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
+                      ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
+                      : `Учить (${stats.totalNeedReview} шт.)`
                   : '🎉 На сегодня всё! (Повторить)'}
               </span>
             </button>
