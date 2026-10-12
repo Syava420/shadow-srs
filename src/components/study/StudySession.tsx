@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FlashCard as FlashCardType, AppSettings, DirectionMode } from '@/types';
-import { scheduleCardReview, isCardDue, isCardNew, calculateMasteryPercent, calculateRetrievability } from '@/lib/fsrs';
+import { scheduleCardReview, isCardDue, isCardNew, calculateMasteryPercent, calculateRetrievability, State } from '@/lib/fsrs';
 import { storage } from '@/lib/storage';
 import { tts } from '@/lib/tts';
 import { FlashCard, CardDirection } from './FlashCard';
@@ -56,8 +56,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const initialQueue = useMemo(() => {
     // 1. Due review cards (already studied, urgent: memories fading right now)
     const dueReviews = cards.filter(isCardDue);
-    // Sort due cards: lowest retrievability first (most urgently needing review)
-    dueReviews.sort((a, b) => calculateRetrievability(a) - calculateRetrievability(b));
+    // Sort due cards:
+    // Priority 1: Forgotten / Relearning cards first (highest urgency: user just failed them)
+    // Priority 2: Lowest retrievability first
+    dueReviews.sort((a, b) => {
+      const aIsRelearning = (a.fsrsCard?.state === State.Learning || a.fsrsCard?.state === State.Relearning) ? 0 : 1;
+      const bIsRelearning = (b.fsrsCard?.state === State.Learning || b.fsrsCard?.state === State.Relearning) ? 0 : 1;
+      if (aIsRelearning !== bIsRelearning) return aIsRelearning - bIsRelearning;
+      return calculateRetrievability(a) - calculateRetrievability(b);
+    });
 
     // 2. New cards (never studied before)
     const newCards = cards.filter(isCardNew);
@@ -70,10 +77,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     // If both reviews and new cards exist: build an interleaved, balanced session
     if (dueReviews.length > 0 && newCards.length > 0) {
-      // Allocate ~70% to reviews and ~30% to new cards within session limit
+      // Allocate ~70% to reviews and ~30% to new cards within session limit,
+      // but ensure all active relearning/forgotten cards are included!
       const limit = effectiveLimit > 0 ? effectiveLimit : dueReviews.length + newCards.length;
-      const targetReviews = Math.max(1, Math.min(dueReviews.length, Math.ceil(limit * 0.7)));
-      const targetNews = Math.min(newCards.length, limit - targetReviews);
+      const relearningCount = dueReviews.filter(c => c.fsrsCard?.state === State.Learning || c.fsrsCard?.state === State.Relearning).length;
+      const baseReviews = Math.ceil(limit * 0.7);
+      const targetReviews = Math.max(relearningCount, Math.min(dueReviews.length, baseReviews));
+      const targetNews = Math.min(newCards.length, Math.max(0, limit - targetReviews));
       
       const sliceReviews = dueReviews.slice(0, targetReviews);
       const sliceNews = newCards.slice(0, targetNews);
@@ -102,15 +112,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     // Fallback if fully caught up: practice learned cards
     return effectiveLimit > 0 ? cards.slice(0, effectiveLimit) : [...cards];
-  }, [cards, cardLimit, settings.sessionLimit]);
+  }, [cards, cardLimit, durationMins, settings.sessionLimit]);
 
   const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isEditingCard, setIsEditingCard] = useState(false);
 
-  // Multi-step repetition logic for forgotten cards
-  const [repsNeeded, setRepsNeeded] = useState<Record<string, number>>({});
+  // Set of card IDs that were marked 'forgotten' during this session and haven't been resolved yet
+  const [forgottenCardIds, setForgottenCardIds] = useState<Set<string>>(new Set());
   
   // Track active time on card (excludes pauses > 45s)
   const cardStartTimeRef = useRef<number>(Date.now());
@@ -206,40 +216,41 @@ export const StudySession: React.FC<StudySessionProps> = ({
       setRememberedCount(prev => prev + 1);
     }
 
-    // 4. Multi-step repetition logic
+    // 4. Intra-session repetition and forgotten tracking
     const currentCardId = currentCard.id;
     let nextQueue = [...queue];
 
     if (!isRemembered) {
-      setRepsNeeded(prev => ({ ...prev, [currentCardId]: 2 }));
-      if (currentIndex + 3 < nextQueue.length) {
-        nextQueue.splice(currentIndex + 3, 0, currentCard);
+      // Mark as unresolved forgotten card
+      setForgottenCardIds(prev => new Set(prev).add(currentCardId));
+      // Re-insert card further in session queue so user gets another attempt
+      if (currentIndex + 4 < nextQueue.length) {
+        nextQueue.splice(currentIndex + 4, 0, currentCard);
       } else {
         nextQueue.push(currentCard);
       }
-      nextQueue.push(currentCard);
     } else {
-      const needed = repsNeeded[currentCardId] || 0;
-      if (needed > 1) {
-        setRepsNeeded(prev => ({ ...prev, [currentCardId]: needed - 1 }));
-        nextQueue.push(currentCard);
-      } else if (needed === 1) {
-        setRepsNeeded(prev => ({ ...prev, [currentCardId]: 0 }));
-      }
+      // Successfully remembered: remove from unresolved forgotten set
+      setForgottenCardIds(prev => {
+        if (!prev.has(currentCardId)) return prev;
+        const next = new Set(prev);
+        next.delete(currentCardId);
+        return next;
+      });
     }
 
     setQueue(nextQueue);
 
     // 5. Advance or Finish
-    if (durationMins > 0 && secondsRemaining === 0) {
-      setIsFinished(true);
-    } else if (currentIndex + 1 < nextQueue.length) {
+    // We do NOT forcefully terminate on timer expiry: user can finish remaining queue
+    // or manually click 'Завершить' in the banner/top bar.
+    if (currentIndex + 1 < nextQueue.length) {
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
       setIsFinished(true);
     }
-  }, [currentCard, currentIndex, queue, repsNeeded, onUpdateCard, durationMins, secondsRemaining]);
+  }, [currentCard, currentIndex, queue, onUpdateCard]);
 
   const handleRestart = () => {
     setQueue([...cards]);
@@ -247,10 +258,27 @@ export const StudySession: React.FC<StudySessionProps> = ({
     setIsFlipped(false);
     setTotalReviewed(0);
     setRememberedCount(0);
-    setRepsNeeded({});
+    setForgottenCardIds(new Set());
     setSecondsRemaining(durationMins * 60);
     setIsFinished(false);
   };
+
+  const handleReviewForgotten = useCallback(() => {
+    const forgottenList = cards.filter(c => forgottenCardIds.has(c.id));
+    if (forgottenList.length === 0) {
+      handleRestart();
+      return;
+    }
+    // Deduplicate in case multiple entries existed
+    const unique = Array.from(new Map(forgottenList.map(c => [c.id, c])).values());
+    setQueue(unique);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setTotalReviewed(0);
+    setRememberedCount(0);
+    setSecondsRemaining(0);
+    setIsFinished(false);
+  }, [cards, forgottenCardIds]);
 
   if (isFinished || !currentCard) {
     return (
@@ -259,6 +287,8 @@ export const StudySession: React.FC<StudySessionProps> = ({
           totalReviewed={totalReviewed}
           rememberedCount={rememberedCount}
           timeSpentMinutes={durationMins > 0 ? durationMins : undefined}
+          unresolvedCount={forgottenCardIds.size}
+          onReviewForgotten={handleReviewForgotten}
           onExit={onExit}
           onRestart={handleRestart}
         />
@@ -305,15 +335,19 @@ export const StudySession: React.FC<StudySessionProps> = ({
           {durationMins > 0 && (
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
-                secondsRemaining < 60
-                  ? 'bg-amber-950/70 border-amber-800 text-amber-300 animate-pulse'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                secondsRemaining === 0
+                  ? 'bg-amber-950/70 border-amber-800 text-amber-300'
+                  : secondsRemaining < 60
+                    ? 'bg-amber-950/70 border-amber-800 text-amber-300 animate-pulse'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-300'
               }`}
               title="Оставшееся время тренировки"
             >
               <Clock className="w-3.5 h-3.5 text-zinc-400" />
               <span>
-                {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')}
+                {secondsRemaining === 0
+                  ? '0:00 (Время вышло)'
+                  : `${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, '0')}`}
               </span>
             </div>
           )}
@@ -322,6 +356,24 @@ export const StudySession: React.FC<StudySessionProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Gentle Non-Intrusive Time-Up Banner */}
+      {durationMins > 0 && secondsRemaining === 0 && (
+        <div className="w-full max-w-4xl mx-auto mt-2 px-4 py-2 rounded-xl bg-amber-950/50 border border-amber-800/80 flex items-center justify-between text-xs text-amber-200">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Время вышло!</strong> Можете доделать оставшиеся карточки ({queue.length - currentIndex} шт.) или завершить сессию сейчас.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsFinished(true)}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ml-3"
+          >
+            Завершить
+          </button>
+        </div>
+      )}
 
       {/* Main Flashcard Taking Whole Center */}
       <div className="w-full flex justify-center items-center my-auto">

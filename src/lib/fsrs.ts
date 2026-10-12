@@ -40,6 +40,14 @@ export function scheduleCardReview(
   const schedulingRecord = f.repeat(currentFSRSCard, now);
   const updatedFSRSCard = schedulingRecord[rating].card;
 
+  // If user forgot the card, it is NOT learned!
+  // ts-fsrs with enable_short_term:false schedules Again for +1 day,
+  // which wrongly hides forgotten cards until tomorrow.
+  // We keep due = now so it remains due right now and prioritizes in the queue:
+  if (!isRemembered) {
+    updatedFSRSCard.due = now;
+  }
+
   const currentSeconds = card.timeSpentSeconds || 0;
   const clampedSeconds = Math.min(45, Math.max(1, activeSeconds));
 
@@ -94,6 +102,8 @@ export function calculateMasteryPercent(card: FlashCard): number {
 export function calculateRetrievability(card: FlashCard): number {
   const state = card.fsrsCard?.state ?? State.New;
   if (state === State.New) return 0;
+  // If card was recently forgotten (Learning or Relearning), memory retrievability is 0%
+  if (state === State.Learning || state === State.Relearning) return 0;
   if (!card.fsrsCard?.last_review || !card.fsrsCard?.stability) return 50;
 
   const lastReviewTime = new Date(card.fsrsCard.last_review).getTime();
@@ -165,3 +175,5 @@ export function calculateDeckStats(cards: FlashCard[]) {
     totalNeedReview: newCount + dueCount,
   };
 }
+
+export { State };
