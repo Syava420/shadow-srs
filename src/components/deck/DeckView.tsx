@@ -16,8 +16,11 @@ import {
   ArrowUpDown,
   Clock,
   CheckCircle2,
-  Pencil
+  Pencil,
+  Target,
+  SlidersHorizontal
 } from 'lucide-react';
+import { DeckSimulatorModal } from '@/components/modals/DeckSimulatorModal';
 
 interface DeckViewProps {
   deck: Deck;
@@ -50,6 +53,7 @@ export const DeckView: React.FC<DeckViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('due_first');
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [directionMode, setDirectionMode] = useState<DirectionMode>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('shadow_srs_direction_mode') as DirectionMode) || 'adaptive';
@@ -211,7 +215,7 @@ export const DeckView: React.FC<DeckViewProps> = ({
                   ? settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
                     ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
                     : `Учить (${stats.totalNeedReview} шт.)`
-                  : 'Повторить колоду'}
+                  : '🎉 На сегодня всё! (Повторить)'}
               </span>
             </button>
           </div>
@@ -224,17 +228,54 @@ export const DeckView: React.FC<DeckViewProps> = ({
             <div className="text-lg font-bold text-amber-400 font-mono">{stats.dueCount}</div>
           </div>
           <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">Новые карточки</div>
+            <div className="text-zinc-500 text-[11px] mb-1">Новые слова</div>
             <div className="text-lg font-bold text-blue-400 font-mono">{stats.newCount}</div>
           </div>
           <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">Изучено (в памяти)</div>
-            <div className="text-lg font-bold text-emerald-400 font-mono">{stats.learnedCount}</div>
+            <div className="text-zinc-500 text-[11px] mb-1">В активе (освоено)</div>
+            <div className="text-lg font-bold text-emerald-400 font-mono">
+              {stats.activeCount} <span className="text-xs text-zinc-500 font-normal">из {stats.total}</span>
+            </div>
           </div>
           <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
             <div className="text-zinc-500 text-[11px] mb-1">Всего в колоде</div>
             <div className="text-lg font-bold text-zinc-300 font-mono">{stats.total}</div>
           </div>
+        </div>
+
+        {/* Study Pace Forecast Banner with Simulator Trigger */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/60 mt-4 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+              <Target className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-zinc-200 font-medium">
+                {stats.newCount === 0 ? (
+                  <span>🎉 Все слова колоды уже в работе!</span>
+                ) : (
+                  <span>
+                    При темпе {settings.dailyGoal || 15} новых слов/день: финиш через{' '}
+                    <strong className="text-emerald-400 font-mono">
+                      {Math.ceil(stats.newCount / (settings.dailyGoal || 15))} дн.
+                    </strong>
+                  </span>
+                )}
+              </div>
+              <div className="text-zinc-500 text-[11px]">
+                {stats.newCount === 0
+                  ? 'Продолжайте повторять для надежного закрепления'
+                  : `Осталось освоить ${stats.newCount} новых слов из ${stats.total}`}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsSimulatorOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors border border-zinc-700/60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Симулятор темпа</span>
+          </button>
         </div>
       </div>
 
@@ -412,6 +453,20 @@ export const DeckView: React.FC<DeckViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Deck Simulator & Target Date Modal */}
+      <DeckSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        deckName={deck.name}
+        totalCards={stats.total}
+        newCardsCount={stats.newCount}
+        activeCardsCount={stats.activeCount}
+        currentDailyGoal={settings.dailyGoal || 15}
+        onApplyDailyGoal={(newGoal) => {
+          onUpdateSettings({ ...settings, dailyGoal: newGoal });
+        }}
+      />
     </div>
   );
 };

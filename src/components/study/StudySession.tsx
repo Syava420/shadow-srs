@@ -56,18 +56,42 @@ export const StudySession: React.FC<StudySessionProps> = ({
     // 2. New cards (never studied before)
     const newCards = cards.filter(isCardNew);
 
-    // Golden SRS principle: Review backlog cards first before learning new cards
-    const candidateCards =
-      dueReviews.length > 0 || newCards.length > 0
-        ? [...dueReviews, ...newCards]
-        : [...cards]; // fallback if everything is caught up: practice learned cards
-
     const effectiveLimit = cardLimit !== undefined ? cardLimit : (settings.sessionLimit ?? 20);
 
-    if (effectiveLimit > 0 && candidateCards.length > effectiveLimit) {
-      return candidateCards.slice(0, effectiveLimit);
+    // If both reviews and new cards exist: build an interleaved, balanced session
+    if (dueReviews.length > 0 && newCards.length > 0) {
+      // Allocate ~70% to reviews and ~30% to new cards within session limit
+      const limit = effectiveLimit > 0 ? effectiveLimit : dueReviews.length + newCards.length;
+      const targetReviews = Math.max(1, Math.min(dueReviews.length, Math.ceil(limit * 0.7)));
+      const targetNews = Math.min(newCards.length, limit - targetReviews);
+      
+      const sliceReviews = dueReviews.slice(0, targetReviews);
+      const sliceNews = newCards.slice(0, targetNews);
+
+      // Interleave in natural pattern: [review, review, new, review, review, new...]
+      const mixed: FlashCardType[] = [];
+      let rIdx = 0;
+      let nIdx = 0;
+      while (rIdx < sliceReviews.length || nIdx < sliceNews.length) {
+        if (rIdx < sliceReviews.length) mixed.push(sliceReviews[rIdx++]);
+        if (rIdx < sliceReviews.length) mixed.push(sliceReviews[rIdx++]);
+        if (nIdx < sliceNews.length) mixed.push(sliceNews[nIdx++]);
+      }
+      return mixed;
     }
-    return candidateCards;
+
+    // If only reviews exist:
+    if (dueReviews.length > 0) {
+      return effectiveLimit > 0 ? dueReviews.slice(0, effectiveLimit) : dueReviews;
+    }
+
+    // If only new cards exist:
+    if (newCards.length > 0) {
+      return effectiveLimit > 0 ? newCards.slice(0, effectiveLimit) : newCards;
+    }
+
+    // Fallback if fully caught up: practice learned cards
+    return effectiveLimit > 0 ? cards.slice(0, effectiveLimit) : [...cards];
   }, [cards, cardLimit, settings.sessionLimit]);
 
   const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);

@@ -1,11 +1,13 @@
 import { fsrs, createEmptyCard, Rating, Card as FSRSCard, State } from 'ts-fsrs';
 import { FlashCard } from '@/types';
 
-// Instantiate FSRS engine with optimal default parameters
+// Instantiate FSRS engine with optimal parameters
+// enable_short_term: false removes annoying intraday 10-minute traps so cards graduate directly to >= 1 day
 const f = fsrs({
   request_retention: 0.9, // Target 90% retention rate
   maximum_interval: 36500, // Up to 100 years
   enable_fuzz: true,      // Slight random fuzz to prevent cards piling up on same day
+  enable_short_term: false, // Cards sleep until tomorrow or future days after daily session
 });
 
 /**
@@ -105,9 +107,10 @@ export function calculateRetrievability(card: FlashCard): number {
 }
 
 /**
- * Returns formatted human-friendly interval string (e.g. "10 мин", "1 дн", "4 дн")
+ * Returns formatted human-friendly interval string (e.g. "В этой сессии", "Завтра", "3 дн", "1 мес")
  */
 export function getNextIntervalText(card: FlashCard, isRemembered: boolean): string {
+  if (!isRemembered) return 'В этой сессии';
   try {
     const now = new Date();
     const currentFSRSCard: FSRSCard = {
@@ -115,21 +118,16 @@ export function getNextIntervalText(card: FlashCard, isRemembered: boolean): str
       due: new Date(card.fsrsCard.due),
       last_review: card.fsrsCard.last_review ? new Date(card.fsrsCard.last_review) : undefined,
     };
-    const rating = isRemembered ? Rating.Good : Rating.Again;
-    const nextCard = f.repeat(currentFSRSCard, now)[rating].card;
+    const nextCard = f.repeat(currentFSRSCard, now)[Rating.Good].card;
     const diffMs = new Date(nextCard.due).getTime() - now.getTime();
     
-    if (diffMs <= 0) return '< 1 мин';
-    const minutes = Math.round(diffMs / (1000 * 60));
-    if (minutes < 60) return `${minutes} мин`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} ч`;
-    const days = Math.round(hours / 24);
+    const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (days <= 1) return 'Завтра';
     if (days < 30) return `${days} дн`;
     const months = Math.round(days / 30);
     return `${months} мес`;
   } catch {
-    return isRemembered ? '1 дн' : '10 мин';
+    return 'Завтра';
   }
 }
 
@@ -139,24 +137,31 @@ export function getNextIntervalText(card: FlashCard, isRemembered: boolean): str
 export function calculateDeckStats(cards: FlashCard[]) {
   let newCount = 0;
   let dueCount = 0;
-  let learnedCount = 0;
+  let masteredCount = 0;
 
   for (const card of cards) {
-    const state = card.fsrsCard?.state ?? State.New;
-    if (state === State.New) {
+    if (isCardNew(card)) {
       newCount++;
-    } else if (isCardDue(card)) {
-      dueCount++;
     } else {
-      learnedCount++;
+      if (isCardDue(card)) {
+        dueCount++;
+      }
+      if (calculateMasteryPercent(card) >= 75) {
+        masteredCount++;
+      }
     }
   }
+
+  // Active count: cards that user has already started studying (non-decreasing progress metric)
+  const activeCount = Math.max(0, cards.length - newCount);
 
   return {
     total: cards.length,
     newCount,
     dueCount,
-    learnedCount,
+    activeCount,
+    masteredCount,
+    learnedCount: activeCount, // Backward compatibility alias
     totalNeedReview: newCount + dueCount,
   };
 }
