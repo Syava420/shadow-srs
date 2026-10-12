@@ -75,6 +75,8 @@ export default function HomePage() {
       if (res.success) {
         refreshData();
         setSyncStatus('synced');
+      } else {
+        setSyncStatus('offline');
       }
     }).catch(() => setSyncStatus('offline'));
 
@@ -84,8 +86,33 @@ export default function HomePage() {
       setSyncStatus('synced');
     });
 
+    const handleOnline = () => {
+      setSyncStatus('syncing');
+      cloudSync.sync().then(res => {
+        if (res.success) {
+          refreshData();
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('offline');
+        }
+      }).catch(() => setSyncStatus('offline'));
+    };
+
+    const handleOffline = () => {
+      setSyncStatus('offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSyncStatus('offline');
+    }
+
     return () => {
       unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 

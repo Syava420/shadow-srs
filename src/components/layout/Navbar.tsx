@@ -131,6 +131,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
           ) : syncStatus === 'synced' ? (
             <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+          ) : syncStatus === 'offline' ? (
+            <span className="w-2 h-2 rounded-full bg-zinc-500" />
           ) : (
             <Cloud className="w-3.5 h-3.5 text-zinc-400" />
           )}
@@ -139,6 +141,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               ? 'Синхронизация...'
               : syncStatus === 'synced'
               ? 'Облако активно'
+              : syncStatus === 'offline'
+              ? 'Офлайн (локально)'
               : 'Синхронизировать'}
           </span>
         </button>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PwaRegister } from "@/components/PwaRegister";
 
 export const viewport: Viewport = {
   themeColor: "#09090b",
@@ -36,6 +37,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#09090b] text-[#e4e4e7] antialiased select-none">
+        <PwaRegister />
         {children}
       </body>
     </html>
