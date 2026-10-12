@@ -50,10 +50,18 @@ export function scheduleCardReview(
 }
 
 /**
- * Determines if a card is due for review today
+ * Determines if a card is new (has never been studied before)
+ */
+export function isCardNew(card: FlashCard): boolean {
+  return !card.fsrsCard || (card.fsrsCard.state ?? State.New) === State.New;
+}
+
+/**
+ * Determines if an already learned card is due for review today
  */
 export function isCardDue(card: FlashCard): boolean {
-  if (!card.fsrsCard || !card.fsrsCard.due) return true;
+  if (!card.fsrsCard || !card.fsrsCard.due) return false;
+  if ((card.fsrsCard.state ?? State.New) === State.New) return false;
   const dueDate = new Date(card.fsrsCard.due);
   return dueDate.getTime() <= Date.now();
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FlashCard as FlashCardType, AppSettings, DirectionMode } from '@/types';
-import { scheduleCardReview, isCardDue, calculateMasteryPercent, calculateRetrievability } from '@/lib/fsrs';
+import { scheduleCardReview, isCardDue, isCardNew, calculateMasteryPercent, calculateRetrievability } from '@/lib/fsrs';
 import { storage } from '@/lib/storage';
 import { tts } from '@/lib/tts';
 import { FlashCard, CardDirection } from './FlashCard';
@@ -48,11 +48,20 @@ export const StudySession: React.FC<StudySessionProps> = ({
   onExit,
 }) => {
   const initialQueue = useMemo(() => {
-    const due = cards.filter(isCardDue);
-    // Sort due cards: cards with lowest retrievability first (most urgently needing review)
-    due.sort((a, b) => calculateRetrievability(a) - calculateRetrievability(b));
+    // 1. Due review cards (already studied, urgent: memories fading right now)
+    const dueReviews = cards.filter(isCardDue);
+    // Sort due cards: lowest retrievability first (most urgently needing review)
+    dueReviews.sort((a, b) => calculateRetrievability(a) - calculateRetrievability(b));
 
-    const candidateCards = due.length > 0 ? due : [...cards];
+    // 2. New cards (never studied before)
+    const newCards = cards.filter(isCardNew);
+
+    // Golden SRS principle: Review backlog cards first before learning new cards
+    const candidateCards =
+      dueReviews.length > 0 || newCards.length > 0
+        ? [...dueReviews, ...newCards]
+        : [...cards]; // fallback if everything is caught up: practice learned cards
+
     const effectiveLimit = cardLimit !== undefined ? cardLimit : (settings.sessionLimit ?? 20);
 
     if (effectiveLimit > 0 && candidateCards.length > effectiveLimit) {

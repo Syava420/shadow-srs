@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Deck, FlashCard, DirectionMode, AppSettings } from '@/types';
-import { calculateDeckStats, isCardDue, calculateMasteryPercent } from '@/lib/fsrs';
+import { calculateDeckStats, isCardDue, isCardNew, calculateMasteryPercent } from '@/lib/fsrs';
 import { tts } from '@/lib/tts';
 import { 
   Play, 
@@ -77,9 +77,9 @@ export const DeckView: React.FC<DeckViewProps> = ({
     result = [...result].sort((a, b) => {
       switch (sortBy) {
         case 'due_first': {
-          const dueA = isCardDue(a) ? 1 : 0;
-          const dueB = isCardDue(b) ? 1 : 0;
-          return dueB - dueA;
+          const scoreA = isCardDue(a) ? 2 : isCardNew(a) ? 1 : 0;
+          const scoreB = isCardDue(b) ? 2 : isCardNew(b) ? 1 : 0;
+          return scoreB - scoreA;
         }
         case 'mastery_asc':
           return calculateMasteryPercent(a) - calculateMasteryPercent(b);
@@ -290,6 +290,7 @@ export const DeckView: React.FC<DeckViewProps> = ({
           <div className="space-y-2">
             {processedCards.map((card) => {
               const isDue = isCardDue(card);
+              const isNew = isCardNew(card);
               const mastery = calculateMasteryPercent(card);
 
               return (
@@ -350,6 +351,11 @@ export const DeckView: React.FC<DeckViewProps> = ({
                     {isDue && (
                       <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">
                         Повторить
+                      </span>
+                    )}
+                    {isNew && (
+                      <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
+                        Новая
                       </span>
                     )}
 
