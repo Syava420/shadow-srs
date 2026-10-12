@@ -73,14 +73,20 @@ export default function HomePage() {
     // Initial background sync with Firebase Firestore
     cloudSync.sync().then(res => {
       if (res.success) {
-        setFolders(storage.getFolders());
-        setDecks(storage.getDecks());
-        setCards(storage.getCards());
-        setSettings(storage.getSettings());
-        setStats(storage.getStats());
+        refreshData();
         setSyncStatus('synced');
       }
     }).catch(() => setSyncStatus('offline'));
+
+    // Realtime subscription: updates UI automatically when any other device changes anything
+    const unsubscribe = cloudSync.subscribeToCloud(() => {
+      refreshData();
+      setSyncStatus('synced');
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const refreshData = () => {
@@ -91,18 +97,25 @@ export default function HomePage() {
     setStats(storage.getStats());
   };
 
-  const triggerCloudPush = () => {
+  const triggerCloudPush = (immediate = false) => {
     if (debouncedPushRef.current) clearTimeout(debouncedPushRef.current);
-    debouncedPushRef.current = setTimeout(() => {
+    const executePush = () => {
       setSyncStatus('syncing');
       cloudSync.pushToCloud(
         storage.getFolders(),
         storage.getDecks(),
         storage.getCards(),
         storage.getStats(),
-        storage.getSettings()
+        storage.getSettings(),
+        storage.getLastUpdatedAt()
       ).then(ok => setSyncStatus(ok ? 'synced' : 'error'));
-    }, 1200);
+    };
+
+    if (immediate) {
+      executePush();
+    } else {
+      debouncedPushRef.current = setTimeout(executePush, 600);
+    }
   };
 
   const handleSyncWithCloud = async () => {
@@ -155,7 +168,7 @@ export default function HomePage() {
     setDecks(updatedDecks);
     storage.saveFolders(updatedFolders);
     storage.saveDecks(updatedDecks);
-    triggerCloudPush();
+    triggerCloudPush(true);
   };
 
   const handleDeleteDeck = (deckId: string) => {
@@ -168,7 +181,7 @@ export default function HomePage() {
     if (selectedDeckId === deckId) {
       setSelectedDeckId(updatedDecks[0]?.id || null);
     }
-    triggerCloudPush();
+    triggerCloudPush(true);
   };
 
   // Card actions

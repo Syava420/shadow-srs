@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   CARDS: 'shadow_srs_cards',
   SETTINGS: 'shadow_srs_settings',
   STATS: 'shadow_srs_stats',
+  UPDATED_AT: 'shadow_srs_updated_at',
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -50,6 +51,20 @@ function getTodayString(): string {
 }
 
 export const storage = {
+  getLastUpdatedAt(): number {
+    return safeGetItem<number>(STORAGE_KEYS.UPDATED_AT, 0);
+  },
+
+  setLastUpdatedAt(timestamp: number): void {
+    safeSetItem(STORAGE_KEYS.UPDATED_AT, timestamp);
+  },
+
+  touch(): number {
+    const now = Date.now();
+    this.setLastUpdatedAt(now);
+    return now;
+  },
+
   getFolders(): Folder[] {
     const folders = safeGetItem<Folder[]>(STORAGE_KEYS.FOLDERS, []);
     if (folders.length === 0 && safeGetItem(STORAGE_KEYS.CARDS, []).length === 0) {
@@ -59,8 +74,9 @@ export const storage = {
     return folders;
   },
 
-  saveFolders(folders: Folder[]): void {
+  saveFolders(folders: Folder[], skipTouch = false): void {
     safeSetItem(STORAGE_KEYS.FOLDERS, folders);
+    if (!skipTouch) this.touch();
   },
 
   getDecks(): Deck[] {
@@ -72,8 +88,9 @@ export const storage = {
     return decks;
   },
 
-  saveDecks(decks: Deck[]): void {
+  saveDecks(decks: Deck[], skipTouch = false): void {
     safeSetItem(STORAGE_KEYS.DECKS, decks);
+    if (!skipTouch) this.touch();
   },
 
   getCards(): FlashCard[] {
@@ -103,8 +120,9 @@ export const storage = {
     return cards;
   },
 
-  saveCards(cards: FlashCard[]): void {
+  saveCards(cards: FlashCard[], skipTouch = false): void {
     safeSetItem(STORAGE_KEYS.CARDS, cards);
+    if (!skipTouch) this.touch();
   },
 
   importDeckAndCards(deck: Deck, newCards: FlashCard[]): void {
@@ -126,22 +144,25 @@ export const storage = {
 
     this.saveDecks(updatedDecks);
     this.saveCards(updatedCards);
+    this.touch();
   },
 
   getSettings(): AppSettings {
     return safeGetItem<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
   },
 
-  saveSettings(settings: AppSettings): void {
+  saveSettings(settings: AppSettings, skipTouch = false): void {
     safeSetItem(STORAGE_KEYS.SETTINGS, settings);
+    if (!skipTouch) this.touch();
   },
 
   getStats(): AppStats {
     return safeGetItem<AppStats>(STORAGE_KEYS.STATS, DEFAULT_STATS);
   },
 
-  saveStats(stats: AppStats): void {
+  saveStats(stats: AppStats, skipTouch = false): void {
     safeSetItem(STORAGE_KEYS.STATS, stats);
+    if (!skipTouch) this.touch();
   },
 
   /**

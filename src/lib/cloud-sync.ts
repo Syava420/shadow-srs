@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { Folder, Deck, FlashCard, AppSettings, AppStats } from '@/types';
 import { storage } from './storage';
@@ -19,17 +19,19 @@ const CHUNK_SIZE = 250; // Keep each document well under Firestore 1MB limit
 
 export const cloudSync = {
   /**
-   * Pushes all current local data to Firestore
+   * Pushes all current local data to Firestore with a specific or current timestamp
    */
   async pushToCloud(
     folders: Folder[],
     decks: Deck[],
     cards: FlashCard[],
     stats: AppStats,
-    settings: AppSettings
+    settings: AppSettings,
+    timestamp?: number
   ): Promise<boolean> {
     try {
-      const now = Date.now();
+      const now = timestamp || Date.now();
+      storage.setLastUpdatedAt(now);
 
       // 1. Save metadata, folders, decks, stats, and settings
       await setDoc(doc(db, 'shadow_srs', 'metadata'), {
@@ -62,7 +64,7 @@ export const cloudSync = {
   },
 
   /**
-   * Pulls all data from Firestore and merges with local storage
+   * Pulls all data from Firestore
    */
   async pullFromCloud(): Promise<{
     folders?: Folder[];
@@ -70,6 +72,7 @@ export const cloudSync = {
     cards?: FlashCard[];
     stats?: AppStats;
     settings?: AppSettings;
+    updatedAt: number;
   } | null> {
     try {
       const metaSnap = await getDoc(doc(db, 'shadow_srs', 'metadata'));
@@ -97,6 +100,7 @@ export const cloudSync = {
         cards: allCards,
         stats: meta.stats,
         settings: meta.settings,
+        updatedAt: meta.updatedAt || 0,
       };
     } catch (error) {
       console.error('Firebase cloud pull failed:', error);
@@ -105,9 +109,9 @@ export const cloudSync = {
   },
 
   /**
-   * Performs smart two-way synchronization:
-   * 1. If cloud has data, load cloud data into local storage.
-   * 2. If cloud is empty but local has data, upload local data to cloud.
+   * Performs timestamp-based synchronization (Last-Write-Wins without zombie resurrecting):
+   * - If cloud was modified more recently than local: replace local storage with cloud (respects deletions!).
+   * - If local has newer unpushed changes: push local to cloud.
    */
   async sync(): Promise<{ success: boolean; pulled: boolean; pushed: boolean }> {
     try {
@@ -118,50 +122,95 @@ export const cloudSync = {
       const localFolders = storage.getFolders();
       const localStats = storage.getStats();
       const localSettings = storage.getSettings();
+      const localTime = storage.getLastUpdatedAt();
 
-      // If cloud has data and it has cards
-      if (cloudData && cloudData.cards && cloudData.cards.length > 0) {
-        // Merge cloud cards with local (cloud takes priority for existing ids)
-        const cloudCardIds = new Set(cloudData.cards.map(c => c.id));
-        const localOnlyCards = localCards.filter(c => !cloudCardIds.has(c.id));
-        const mergedCards = [...cloudData.cards, ...localOnlyCards];
-
-        // Merge decks
-        const cloudDeckIds = new Set(cloudData.decks?.map(d => d.id) || []);
-        const localOnlyDecks = localDecks.filter(d => !cloudDeckIds.has(d.id));
-        const mergedDecks = [...(cloudData.decks || []), ...localOnlyDecks];
-
-        // Save locally
-        if (cloudData.folders && cloudData.folders.length > 0) storage.saveFolders(cloudData.folders);
-        storage.saveDecks(mergedDecks);
-        storage.saveCards(mergedCards);
-        if (cloudData.stats) storage.saveStats(cloudData.stats);
-        if (cloudData.settings) storage.saveSettings(cloudData.settings);
-
-        // If local had extra items, push merged back to cloud
-        if (localOnlyCards.length > 0 || localOnlyDecks.length > 0) {
-          await this.pushToCloud(
-            cloudData.folders || localFolders,
-            mergedDecks,
-            mergedCards,
-            cloudData.stats || localStats,
-            cloudData.settings || localSettings
-          );
+      // Case 1: Cloud is empty, push local to cloud
+      if (!cloudData) {
+        if (localCards.length > 0) {
+          const now = storage.touch();
+          await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now);
+          return { success: true, pulled: false, pushed: true };
         }
-
-        return { success: true, pulled: true, pushed: localOnlyCards.length > 0 };
+        return { success: true, pulled: false, pushed: false };
       }
 
-      // If cloud is empty or has fewer cards than local, push local to cloud
-      if (localCards.length > 0) {
-        await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings);
+      const cloudTime = cloudData.updatedAt || 0;
+
+      // Case 2: Fresh device with no local history, or cloud is strictly newer
+      // Overwrite local with cloud state — NEVER RESURRECT DELETED DECKS/CARDS!
+      if (cloudTime > localTime || localTime === 0) {
+        storage.saveFolders(cloudData.folders || [], true);
+        storage.saveDecks(cloudData.decks || [], true);
+        storage.saveCards(cloudData.cards || [], true);
+        if (cloudData.stats) storage.saveStats(cloudData.stats, true);
+        if (cloudData.settings) storage.saveSettings(cloudData.settings, true);
+        storage.setLastUpdatedAt(cloudTime);
+
+        return { success: true, pulled: true, pushed: false };
+      }
+
+      // Case 3: Local has newer changes made while offline
+      if (localTime > cloudTime) {
+        await this.pushToCloud(
+          localFolders,
+          localDecks,
+          localCards,
+          localStats,
+          localSettings,
+          localTime
+        );
         return { success: true, pulled: false, pushed: true };
       }
 
+      // Case 4: Already identical
       return { success: true, pulled: false, pushed: false };
     } catch (e) {
       console.error('Sync failed:', e);
       return { success: false, pulled: false, pushed: false };
+    }
+  },
+
+  /**
+   * Listens for real-time changes in Firestore.
+   * When another device deletes or adds anything, this device automatically
+   * updates its local storage and triggers React re-render.
+   */
+  subscribeToCloud(onDataChanged: () => void): () => void {
+    if (typeof window === 'undefined') return () => {};
+
+    try {
+      const metaRef = doc(db, 'shadow_srs', 'metadata');
+      const unsubscribe = onSnapshot(
+        metaRef,
+        async (snap) => {
+          if (!snap.exists()) return;
+          const meta = snap.data();
+          const cloudTime = meta.updatedAt || 0;
+          const localTime = storage.getLastUpdatedAt();
+
+          // Only pull if cloud timestamp is newer than our local actions
+          if (cloudTime > localTime) {
+            const fullCloud = await cloudSync.pullFromCloud();
+            if (fullCloud) {
+              storage.saveFolders(fullCloud.folders || [], true);
+              storage.saveDecks(fullCloud.decks || [], true);
+              storage.saveCards(fullCloud.cards || [], true);
+              if (fullCloud.stats) storage.saveStats(fullCloud.stats, true);
+              if (fullCloud.settings) storage.saveSettings(fullCloud.settings, true);
+              storage.setLastUpdatedAt(cloudTime);
+              onDataChanged();
+            }
+          }
+        },
+        (error) => {
+          console.warn('Realtime cloud listener error:', error);
+        }
+      );
+
+      return unsubscribe;
+    } catch (err) {
+      console.warn('Could not initialize cloud listener:', err);
+      return () => {};
     }
   },
 };
