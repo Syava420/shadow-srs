@@ -269,21 +269,21 @@ export const DeckView: React.FC<DeckViewProps> = ({
             </div>
             <div>
               <div className="text-zinc-200 font-medium">
-                {stats.newCount === 0 ? (
-                  <span>🎉 Все слова колоды уже в работе!</span>
+                {stats.dueCount === 0 && stats.newCount === 0 ? (
+                  <span>🎉 Все слова колоды освоены и повторены!</span>
                 ) : (
                   <span>
-                    При темпе {settings.dailyGoal || 15} новых слов/день: финиш через{' '}
+                    При темпе {settings.dailyGoal || 20} карт/день: финиш через{' '}
                     <strong className="text-emerald-400 font-mono">
-                      {Math.ceil(stats.newCount / (settings.dailyGoal || 15))} дн.
+                      {Math.ceil((stats.dueCount + stats.newCount) / (settings.dailyGoal || 20))} дн.
                     </strong>
                   </span>
                 )}
               </div>
               <div className="text-zinc-500 text-[11px]">
-                {stats.newCount === 0
-                  ? 'Продолжайте повторять для надежного закрепления'
-                  : `Осталось освоить ${stats.newCount} новых слов из ${stats.total}`}
+                {stats.dueCount === 0 && stats.newCount === 0
+                  ? 'Колода чиста! Отдыхайте до завтра.'
+                  : `Осталось: ${stats.dueCount} повторений + ${stats.newCount} новых (${stats.dueCount + stats.newCount} шт.)`}
               </div>
             </div>
           </div>
@@ -478,9 +478,10 @@ export const DeckView: React.FC<DeckViewProps> = ({
         onClose={() => setIsSimulatorOpen(false)}
         deckName={deck.name}
         totalCards={stats.total}
+        dueCardsCount={stats.dueCount}
         newCardsCount={stats.newCount}
         activeCardsCount={stats.activeCount}
-        currentDailyGoal={settings.dailyGoal || 15}
+        currentDailyGoal={settings.dailyGoal || 20}
         onApplyDailyGoal={(newGoal) => {
           onUpdateSettings({ ...settings, dailyGoal: newGoal });
         }}
