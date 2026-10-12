@@ -1,0 +1,69 @@
+import { Card as FSRSCard } from 'ts-fsrs';
+
+export type DirectionMode = 'adaptive' | 'random' | 'ru_en' | 'en_ru';
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface Deck {
+  id: string;
+  folderId?: string; // Optional: can be in root or inside a folder
+  name: string;
+  description?: string;
+  createdAt: number;
+}
+
+export interface FlashCard {
+  id: string;
+  deckId: string;
+  front: string; // Russian (Question)
+  back: string;  // English (Answer & Pronunciation)
+  imageUrl?: string;
+  audioUrl?: string;
+  fsrsCard: FSRSCard; // FSRS state: due, stability, difficulty, reps, lapses, state
+  createdAt: number;
+  lastStudiedAt?: number;
+  timeSpentSeconds?: number; // Total active study time spent on this card
+}
+
+export interface AppSettings {
+  voiceAccent: 'en-US' | 'en-GB';
+  speechRate: number; // 0.7 to 1.3, default 1.0
+  autoPlayAudio: boolean; // Auto play when flipped to English
+  showImages: boolean;
+  dailyGoal: number; // default 20
+  sessionLimit: number; // default 20 (0 = unlimited)
+}
+
+export interface ImportPreviewItem {
+  id: string;
+  front: string;
+  back: string;
+  selected: boolean;
+  isDuplicate?: boolean;
+}
+
+export interface DailyActivity {
+  cardsReviewed: number;
+  activeSeconds: number;
+}
+
+export interface AppStats {
+  streakDays: number;
+  lastStudiedDate?: string;
+  totalActiveSeconds: number;
+  dailyHistory: Record<string, DailyActivity>; // Key: "YYYY-MM-DD"
+}
+
+export interface BackupData {
+  version: number;
+  exportedAt: number;
+  folders: Folder[];
+  decks: Deck[];
+  cards: FlashCard[];
+  settings: AppSettings;
+  stats?: AppStats;
+}

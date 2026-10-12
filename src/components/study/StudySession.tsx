@@ -1,0 +1,255 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { FlashCard as FlashCardType, AppSettings, DirectionMode } from '@/types';
+import { scheduleCardReview, isCardDue, calculateMasteryPercent, calculateRetrievability } from '@/lib/fsrs';
+import { storage } from '@/lib/storage';
+import { tts } from '@/lib/tts';
+import { FlashCard, CardDirection } from './FlashCard';
+import { StudyControls } from './StudyControls';
+import { StudySummary } from './StudySummary';
+import { X } from 'lucide-react';
+
+export type { DirectionMode };
+
+interface StudySessionProps {
+  cards: FlashCardType[];
+  settings: AppSettings;
+  directionMode?: DirectionMode;
+  cardLimit?: number;
+  onUpdateCard: (updatedCard: FlashCardType) => void;
+  onExit: () => void;
+}
+
+function computeCardDirection(card: FlashCardType, mode: DirectionMode = 'adaptive'): CardDirection {
+  if (mode === 'ru_en') return 'ru_to_en';
+  if (mode === 'en_ru') return 'en_to_ru';
+  if (mode === 'random') return Math.random() < 0.5 ? 'ru_to_en' : 'en_to_ru';
+
+  // Adaptive FSRS mode:
+  const mastery = calculateMasteryPercent(card);
+  // Fresh or recently forgotten: en_to_ru (Receptive/Listening)
+  if (mastery < 35) return 'en_to_ru';
+  // Intermediate learning: ru_to_en (Productive recall/Speaking)
+  if (mastery < 75) return 'ru_to_en';
+  // Strongly mastered: 50/50 mix
+  return Math.random() < 0.5 ? 'ru_to_en' : 'en_to_ru';
+}
+
+export const StudySession: React.FC<StudySessionProps> = ({
+  cards,
+  settings,
+  directionMode = 'adaptive',
+  cardLimit,
+  onUpdateCard,
+  onExit,
+}) => {
+  const initialQueue = useMemo(() => {
+    const due = cards.filter(isCardDue);
+    // Sort due cards: cards with lowest retrievability first (most urgently needing review)
+    due.sort((a, b) => calculateRetrievability(a) - calculateRetrievability(b));
+
+    const candidateCards = due.length > 0 ? due : [...cards];
+    const effectiveLimit = cardLimit !== undefined ? cardLimit : (settings.sessionLimit ?? 20);
+
+    if (effectiveLimit > 0 && candidateCards.length > effectiveLimit) {
+      return candidateCards.slice(0, effectiveLimit);
+    }
+    return candidateCards;
+  }, [cards, cardLimit, settings.sessionLimit]);
+
+  const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  // Multi-step repetition logic for forgotten cards
+  const [repsNeeded, setRepsNeeded] = useState<Record<string, number>>({});
+  
+  // Track active time on card (excludes pauses > 45s)
+  const cardStartTimeRef = useRef<number>(Date.now());
+
+  // Session statistics
+  const [totalReviewed, setTotalReviewed] = useState(0);
+  const [rememberedCount, setRememberedCount] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
+
+  const currentCard = queue[currentIndex];
+
+  // Dynamic direction per card
+  const currentDirection: CardDirection = useMemo(() => {
+    if (!currentCard) return 'ru_to_en';
+    return computeCardDirection(currentCard, directionMode);
+  }, [currentCard, directionMode]);
+
+  useEffect(() => {
+    cardStartTimeRef.current = Date.now();
+  }, [currentIndex]);
+
+  // Audio behavior based on direction:
+  // en_to_ru: audio plays on appearance (when NOT flipped)
+  // ru_to_en: audio plays on flip (when flipped to English)
+  useEffect(() => {
+    if (!currentCard || !settings.autoPlayAudio) return;
+
+    if (currentDirection === 'en_to_ru' && !isFlipped) {
+      const timer = setTimeout(() => {
+        tts.speak(currentCard.back, {
+          accent: settings.voiceAccent,
+          rate: settings.speechRate,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (currentDirection === 'ru_to_en' && isFlipped) {
+      const timer = setTimeout(() => {
+        tts.speak(currentCard.back, {
+          accent: settings.voiceAccent,
+          rate: settings.speechRate,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentCard, isFlipped, currentDirection, settings.autoPlayAudio, settings.voiceAccent, settings.speechRate]);
+
+  const handleFlip = useCallback(() => {
+    setIsFlipped(prev => !prev);
+  }, []);
+
+  const handleReplayAudio = useCallback(() => {
+    if (currentCard) {
+      tts.speak(currentCard.back, {
+        accent: settings.voiceAccent,
+        rate: settings.speechRate,
+      });
+    }
+  }, [currentCard, settings.voiceAccent, settings.speechRate]);
+
+  const handleRate = useCallback((isRemembered: boolean) => {
+    if (!currentCard) return;
+
+    // 1. Calculate active seconds spent (capped at 45s)
+    const elapsedSecs = Math.min(45, (Date.now() - cardStartTimeRef.current) / 1000);
+    storage.recordReviewActivity(elapsedSecs);
+
+    // 2. Schedule via FSRS
+    const updated = scheduleCardReview(currentCard, isRemembered, elapsedSecs);
+    onUpdateCard(updated);
+
+    // 3. Update session counters
+    setTotalReviewed(prev => prev + 1);
+    if (isRemembered) {
+      setRememberedCount(prev => prev + 1);
+    }
+
+    // 4. Multi-step repetition logic
+    const currentCardId = currentCard.id;
+    let nextQueue = [...queue];
+
+    if (!isRemembered) {
+      setRepsNeeded(prev => ({ ...prev, [currentCardId]: 2 }));
+      if (currentIndex + 3 < nextQueue.length) {
+        nextQueue.splice(currentIndex + 3, 0, currentCard);
+      } else {
+        nextQueue.push(currentCard);
+      }
+      nextQueue.push(currentCard);
+    } else {
+      const needed = repsNeeded[currentCardId] || 0;
+      if (needed > 1) {
+        setRepsNeeded(prev => ({ ...prev, [currentCardId]: needed - 1 }));
+        nextQueue.push(currentCard);
+      } else if (needed === 1) {
+        setRepsNeeded(prev => ({ ...prev, [currentCardId]: 0 }));
+      }
+    }
+
+    setQueue(nextQueue);
+
+    // 5. Advance
+    if (currentIndex + 1 < nextQueue.length) {
+      setCurrentIndex(prev => prev + 1);
+      setIsFlipped(false);
+    } else {
+      setIsFinished(true);
+    }
+  }, [currentCard, currentIndex, queue, repsNeeded, onUpdateCard]);
+
+  const handleRestart = () => {
+    setQueue([...cards]);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setTotalReviewed(0);
+    setRememberedCount(0);
+    setRepsNeeded({});
+    setIsFinished(false);
+  };
+
+  if (isFinished || !currentCard) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-center items-center">
+        <StudySummary
+          totalReviewed={totalReviewed}
+          rememberedCount={rememberedCount}
+          onExit={onExit}
+          onRestart={handleRestart}
+        />
+      </div>
+    );
+  }
+
+  const progressPercent = Math.min(100, Math.round(((currentIndex + 1) / queue.length) * 100));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none overflow-hidden">
+      {/* Top Ultra-Minimal Bar */}
+      <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-4">
+        <button
+          onClick={onExit}
+          className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
+          title="Завершить тренировку (Esc)"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Minimal Progress Line */}
+        <div className="flex-1 max-w-md mx-4">
+          <div className="w-full h-1.5 rounded-full bg-zinc-850 overflow-hidden">
+            <div
+              className="h-full bg-zinc-400 transition-all duration-300 rounded-full"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Card Counter Only */}
+        <span className="text-xs font-mono text-zinc-500">
+          {currentIndex + 1} / {queue.length}
+        </span>
+      </div>
+
+      {/* Main Flashcard Taking Whole Center */}
+      <div className="w-full flex justify-center items-center my-auto">
+        <FlashCard
+          card={currentCard}
+          direction={currentDirection}
+          isFlipped={isFlipped}
+          onFlip={handleFlip}
+          onRate={handleRate}
+          showImages={settings.showImages}
+          voiceAccent={settings.voiceAccent}
+          speechRate={settings.speechRate}
+        />
+      </div>
+
+      {/* Ergonomic Bottom Controls */}
+      <div className="w-full flex justify-center pb-2 sm:pb-4">
+        <StudyControls
+          card={currentCard}
+          isFlipped={isFlipped}
+          onFlip={handleFlip}
+          onRate={handleRate}
+          onReplayAudio={handleReplayAudio}
+        />
+      </div>
+    </div>
+  );
+};
