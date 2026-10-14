@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { XCircle, CheckCircle2 } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { FlashCard } from '@/types';
 import { getNextIntervalText } from '@/lib/fsrs';
 
@@ -50,17 +50,18 @@ export const StudyControls: React.FC<StudyControlsProps> = ({
   }, [onFlip, onRate, onReplayAudio]);
 
   return (
-    <div className="w-full max-w-xl grid grid-cols-2 gap-4">
+    <div className="w-full max-w-lg grid grid-cols-2 gap-3 select-none">
       {/* ЗАБЫЛ (1 / ←) */}
       <button
         onClick={() => onRate(false)}
-        className="py-3 px-5 rounded-2xl bg-[#140e10] hover:bg-[#1a1113] active:scale-95 text-zinc-300 hover:text-red-300 border border-red-950/60 hover:border-red-900 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer shadow-md group"
+        className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-850 active:scale-[0.98] border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
       >
-        <div className="flex items-center gap-2 text-sm font-semibold text-red-400 group-hover:text-red-300">
-          <XCircle className="w-4 h-4" />
+        <div className="flex items-center gap-2 text-xs font-medium text-zinc-200">
+          <X className="w-3.5 h-3.5 text-zinc-400" />
           <span>Забыл</span>
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-500">1</kbd>
         </div>
-        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400">
+        <span className="text-[11px] font-mono text-zinc-500">
           Повтор: {forgotInterval.toLowerCase()}
         </span>
       </button>
@@ -68,13 +69,14 @@ export const StudyControls: React.FC<StudyControlsProps> = ({
       {/* ВСПОМНИЛ (2 / →) */}
       <button
         onClick={() => onRate(true)}
-        className="py-3 px-5 rounded-2xl bg-[#0e1611] hover:bg-[#121e16] active:scale-95 text-zinc-300 hover:text-emerald-300 border border-emerald-950/60 hover:border-emerald-900 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer shadow-md group"
+        className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-850 active:scale-[0.98] border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
       >
-        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400 group-hover:text-emerald-300">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="flex items-center gap-2 text-xs font-medium text-zinc-200">
+          <Check className="w-3.5 h-3.5 text-zinc-400" />
           <span>Вспомнил</span>
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-500">2</kbd>
         </div>
-        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400">
+        <span className="text-[11px] font-mono text-zinc-500">
           Повтор: {rememberedInterval.startsWith('Завтра') ? 'Завтра' : `через ${rememberedInterval}`}
         </span>
       </button>

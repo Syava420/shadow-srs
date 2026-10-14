@@ -164,10 +164,10 @@ export const DeckView: React.FC<DeckViewProps> = ({
               className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 text-xs border border-zinc-800 outline-none cursor-pointer focus:border-zinc-700 transition-colors"
               title="Направление изучения карточек"
             >
-              <option value="adaptive">🧠 Умный адаптивный (En ⇄ Ru)</option>
-              <option value="random">🔀 Случайный (50 / 50)</option>
-              <option value="ru_en">🇷🇺 → 🇺🇸 Только говорение</option>
-              <option value="en_ru">🇺🇸 → 🇷🇺 Только аудирование</option>
+              <option value="adaptive">Адаптивный (En ⇄ Ru)</option>
+              <option value="random">Случайный (50 / 50)</option>
+              <option value="ru_en">RU → EN (Говорение)</option>
+              <option value="en_ru">EN → RU (Аудирование)</option>
             </select>
 
             {/* Session Batch Limit or Duration Selector */}
@@ -197,21 +197,21 @@ export const DeckView: React.FC<DeckViewProps> = ({
                 }
               }}
               className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 text-xs border border-zinc-800 outline-none cursor-pointer focus:border-zinc-700 transition-colors font-mono"
-              title="Режим тренировки: по времени (таймер) или по количеству карточек"
+              title="Режим тренировки: по времени или по количеству карточек"
             >
-              <optgroup label="⏱️ По времени (таймер):">
-                <option value="time_5">⚡ 5 минут (~12 карт)</option>
-                <option value="time_10">⏱️ 10 минут (~25 карт)</option>
-                <option value="time_15">⏱️ 15 минут (~35 карт)</option>
-                <option value="time_20">🔥 20 минут (~50 карт)</option>
+              <optgroup label="По времени:">
+                <option value="time_5">5 минут (~12 карт)</option>
+                <option value="time_10">10 минут (~25 карт)</option>
+                <option value="time_15">15 минут (~35 карт)</option>
+                <option value="time_20">20 минут (~50 карт)</option>
               </optgroup>
-              <optgroup label="🎯 По количеству карт:">
-                <option value={5}>🎯 5 карточек</option>
-                <option value={10}>🎯 10 карточек</option>
-                <option value={20}>🎯 20 карточек (стандарт)</option>
-                <option value={30}>🎯 30 карточек</option>
-                <option value={50}>🎯 50 карточек</option>
-                <option value={0}>♾️ Без лимита</option>
+              <optgroup label="По количеству:">
+                <option value={5}>5 карточек</option>
+                <option value={10}>10 карточек</option>
+                <option value={20}>20 карточек</option>
+                <option value={30}>30 карточек</option>
+                <option value={50}>50 карточек</option>
+                <option value={0}>Без лимита</option>
               </optgroup>
             </select>
 
@@ -222,18 +222,18 @@ export const DeckView: React.FC<DeckViewProps> = ({
               className={`flex items-center gap-2 px-5 py-2 rounded-xl font-medium text-xs transition-all cursor-pointer ${
                 deckCards.length === 0
                   ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-800'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950 shadow-md hover:scale-[1.02]'
+                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950 shadow-md active:scale-[0.98]'
               }`}
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>
                 {stats.totalNeedReview > 0 
                   ? settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
-                    ? `Учить (⏱️ ${settings.sessionDurationMinutes} мин)`
+                    ? `Учить (${settings.sessionDurationMinutes} мин)`
                     : settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
                       ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
                       : `Учить (${stats.totalNeedReview} шт.)`
-                  : '🎉 На сегодня всё! (Повторить)'}
+                  : 'Повторить колоду'}
               </span>
             </button>
           </div>
@@ -264,13 +264,13 @@ export const DeckView: React.FC<DeckViewProps> = ({
         {/* Study Pace Forecast Banner with Simulator Trigger */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/60 mt-4 text-xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 flex-shrink-0">
               <Target className="w-4 h-4" />
             </div>
             <div>
               <div className="text-zinc-200 font-medium">
                 {stats.dueCount === 0 && stats.newCount === 0 ? (
-                  <span>🎉 Все слова колоды освоены и повторены!</span>
+                  <span>Все слова колоды освоены и повторены</span>
                 ) : (
                   <span>
                     При темпе {settings.dailyGoal || 20} карт/день: финиш через{' '}

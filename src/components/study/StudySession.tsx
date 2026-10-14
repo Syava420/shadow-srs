@@ -345,14 +345,14 @@ export const StudySession: React.FC<StudySessionProps> = ({
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
                 secondsRemaining === 0
-                  ? 'bg-amber-950/70 border-amber-800 text-amber-300'
+                  ? 'bg-zinc-900 border-zinc-700 text-zinc-300'
                   : secondsRemaining < 60
-                    ? 'bg-amber-950/70 border-amber-800 text-amber-300 animate-pulse'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                    ? 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
               }`}
               title="Оставшееся время тренировки"
             >
-              <Clock className="w-3.5 h-3.5 text-zinc-400" />
+              <Clock className="w-3.5 h-3.5 text-zinc-500" />
               <span>
                 {secondsRemaining === 0
                   ? '0:00 (Время вышло)'
@@ -368,16 +368,16 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
       {/* Gentle Non-Intrusive Time-Up Banner */}
       {durationMins > 0 && secondsRemaining === 0 && (
-        <div className="w-full max-w-4xl mx-auto mt-2 px-4 py-2 rounded-xl bg-amber-950/50 border border-amber-800/80 flex items-center justify-between text-xs text-amber-200">
+        <div className="w-full max-w-4xl mx-auto mt-2 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between text-xs text-zinc-300">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>
-              <strong>Время вышло!</strong> Можете доделать оставшиеся карточки ({queue.length - currentIndex} шт.) или завершить сессию сейчас.
+              Время тренировки вышло. Можно доделать карточки ({queue.length - currentIndex} шт.) или завершить сейчас.
             </span>
           </div>
           <button
             onClick={() => setIsFinished(true)}
-            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ml-3"
+            className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium rounded-lg transition-colors cursor-pointer shrink-0 ml-3 text-xs"
           >
             Завершить
           </button>

@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, ArrowLeft, RotateCcw, Zap } from 'lucide-react';
+import { CheckCheck, ArrowLeft, RotateCcw } from 'lucide-react';
 
 interface StudySummaryProps {
   totalReviewed: number;
@@ -27,8 +27,8 @@ export const StudySummary: React.FC<StudySummaryProps> = ({
     // Launch celebratory confetti if completed without forgotten backlog or good score
     if (unresolvedCount === 0) {
       confetti({
-        particleCount: 50,
-        spread: 60,
+        particleCount: 40,
+        spread: 50,
         origin: { y: 0.7 },
         colors: ['#a1a1aa', '#71717a', '#d4d4d8', '#ffffff'],
       });
@@ -41,65 +41,65 @@ export const StudySummary: React.FC<StudySummaryProps> = ({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-      <div className="w-16 h-16 rounded-3xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-200 mb-6 shadow-xl">
-        <Trophy className="w-8 h-8 text-amber-400/90" />
+      <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 mb-5 shadow-sm">
+        <CheckCheck className="w-6 h-6 text-zinc-300" />
       </div>
 
-      <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-2">
-        {unresolvedCount === 0 ? 'Отличная работа!' : 'Тренировка завершена!'}
+      <h2 className="text-xl md:text-2xl font-semibold text-zinc-100 mb-2">
+        {unresolvedCount === 0 ? 'Сессия завершена' : 'Тренировка окончена'}
       </h2>
-      <p className="text-sm text-zinc-400 max-w-md mb-6">
+      <p className="text-xs text-zinc-400 max-w-md mb-6">
         {timeSpentMinutes && timeSpentMinutes > 0
           ? `Сессия на ${timeSpentMinutes} минут завершена.`
           : 'Карточки запланированной сессии пройдены.'}
       </p>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 gap-4 w-full max-w-xs mb-6 text-left">
-        <div className="p-4 rounded-2xl bg-[#121215] border border-zinc-800/80">
-          <div className="text-[11px] text-zinc-500 mb-1">Пройдено</div>
-          <div className="text-xl font-bold text-zinc-200 font-mono">{totalReviewed} шт.</div>
+      <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-6 text-left">
+        <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+          <div className="text-[11px] text-zinc-500 mb-1 font-mono">Пройдено</div>
+          <div className="text-lg font-semibold text-zinc-200 font-mono">{totalReviewed} шт.</div>
         </div>
-        <div className="p-4 rounded-2xl bg-[#121215] border border-zinc-800/80">
-          <div className="text-[11px] text-zinc-500 mb-1">Успешность</div>
-          <div className="text-xl font-bold text-emerald-400 font-mono">{retentionPercent}%</div>
+        <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+          <div className="text-[11px] text-zinc-500 mb-1 font-mono">Успешность</div>
+          <div className="text-lg font-semibold text-zinc-200 font-mono">{retentionPercent}%</div>
         </div>
       </div>
 
       {/* Notice if forgotten cards remain */}
       {unresolvedCount > 0 && (
-        <div className="w-full max-w-xs mb-6 p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-200 text-center flex items-center justify-center gap-2">
-          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="w-full max-w-xs mb-6 p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 text-center flex items-center justify-center gap-2">
+          <RotateCcw className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span>
             Осталось <strong>{unresolvedCount} забытых слов</strong>.
           </span>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
         {unresolvedCount > 0 && onReviewForgotten && (
           <button
             onClick={onReviewForgotten}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-all cursor-pointer shadow-lg hover:scale-[1.02]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium text-xs transition-colors cursor-pointer"
           >
-            <Zap className="w-4 h-4 fill-current" />
-            <span>🔥 Добить забытые слова ({unresolvedCount} шт.)</span>
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Повторить забытые ({unresolvedCount})</span>
           </button>
         )}
 
         <button
           onClick={onExit}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium text-xs transition-colors cursor-pointer shadow-md"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-medium text-xs transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>К списку колод</span>
         </button>
 
         <button
           onClick={onRestart}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-medium text-xs transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-medium text-xs transition-colors cursor-pointer"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
           <span>Повторить всю сессию</span>
         </button>
       </div>

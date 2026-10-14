@@ -133,9 +133,9 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   const swipeRotation = dragOffset * 0.05;
   const swipeGlow =
     dragOffset > 30
-      ? 'border-emerald-500/80 shadow-[0_0_30px_rgba(16,185,129,0.2)]'
+      ? 'border-zinc-500'
       : dragOffset < -30
-      ? 'border-red-500/80 shadow-[0_0_30px_rgba(239,68,68,0.2)]'
+      ? 'border-zinc-700'
       : 'border-zinc-800/80 hover:border-zinc-700/80';
 
   return (
@@ -160,12 +160,12 @@ export const FlashCard: React.FC<FlashCardProps> = ({
       >
         {/* FRONT SIDE (QUESTION) */}
         <div
-          className={`absolute inset-0 w-full h-full backface-hidden rounded-3xl bg-[#121215] border ${swipeGlow} p-6 md:p-12 flex flex-col items-center justify-between shadow-2xl transition-all`}
+          className={`absolute inset-0 w-full h-full backface-hidden rounded-2xl bg-[#111114] border ${swipeGlow} p-6 md:p-12 flex flex-col items-center justify-between shadow-xl transition-all`}
         >
           {/* Top Indicators */}
           <div className="w-full flex items-center justify-between">
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500">
-              {isRuToEn ? '🇷🇺 → 🇺🇸' : '🇺🇸 → 🇷🇺 (Аудирование)'}
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
+              {isRuToEn ? 'RU → EN' : 'EN → RU · Аудирование'}
             </span>
 
             <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
 
         {/* BACK SIDE (ANSWER) */}
         <div
-          className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-3xl bg-[#131317] border ${swipeGlow} p-6 md:p-12 flex flex-col items-center justify-between shadow-2xl transition-all`}
+          className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl bg-[#111114] border ${swipeGlow} p-6 md:p-12 flex flex-col items-center justify-between shadow-xl transition-all`}
         >
           {/* Top Controls */}
           <div className="w-full flex items-center justify-between">

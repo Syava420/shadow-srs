@@ -130,7 +130,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {syncStatus === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
           ) : syncStatus === 'synced' ? (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
           ) : syncStatus === 'offline' ? (
             <span className="w-2 h-2 rounded-full bg-zinc-500" />
           ) : (
