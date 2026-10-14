@@ -110,9 +110,16 @@ export const FlashCard: React.FC<FlashCardProps> = ({
     return getWordGloss(card.back);
   }, [card.back, card.gloss, enrichedGloss]);
 
+  const lastAudioClickRef = useRef<number>(0);
+
   const handleReplayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
-    tts.speak(card.back, { accent: voiceAccent, rate: speechRate });
+    const now = Date.now();
+    const isSlow = now - lastAudioClickRef.current < 1600;
+    lastAudioClickRef.current = now;
+
+    const rate = isSlow ? Math.max(0.6, speechRate * 0.65) : speechRate;
+    tts.speak(card.back, { accent: voiceAccent, rate });
   };
 
   // Touch Gesture Handlers (Mobile Swipe & Long Press)

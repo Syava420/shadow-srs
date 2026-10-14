@@ -190,11 +190,18 @@ export const StudySession: React.FC<StudySessionProps> = ({
     setIsFlipped(prev => !prev);
   }, []);
 
+  const lastAudioClickRef = useRef<number>(0);
+
   const handleReplayAudio = useCallback(() => {
     if (currentCard) {
+      const now = Date.now();
+      const isSlow = now - lastAudioClickRef.current < 1600;
+      lastAudioClickRef.current = now;
+
+      const rate = isSlow ? Math.max(0.6, settings.speechRate * 0.65) : settings.speechRate;
       tts.speak(currentCard.back, {
         accent: settings.voiceAccent,
-        rate: settings.speechRate,
+        rate,
       });
     }
   }, [currentCard, settings.voiceAccent, settings.speechRate]);

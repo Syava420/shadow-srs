@@ -71,13 +71,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </button>
 
-        <div className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
-          <Layers className="w-5 h-5 text-zinc-300" />
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
+          <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-300" />
         </div>
         <div>
-          <h1 className="text-sm font-semibold tracking-wide text-zinc-200 flex items-center gap-2">
+          <h1 className="text-sm font-semibold tracking-wide text-zinc-200 flex items-center gap-1.5 sm:gap-2">
             ShadowSRS
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 hidden sm:inline-block">
               FSRS
             </span>
           </h1>

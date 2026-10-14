@@ -99,22 +99,23 @@ export const DeckView: React.FC<DeckViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] overflow-y-auto bg-[#09090b] p-4 md:p-6 select-none">
-      {/* Top Banner / Deck Overview */}
-      <div className="p-6 rounded-2xl bg-[#121215] border border-zinc-800/80 mb-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs uppercase tracking-wider text-zinc-500 font-medium">Колода</span>
+      {/* Top Banner / Deck Overview - Clean & Ergonomic */}
+      <div className="p-5 md:p-6 rounded-2xl bg-[#121215] border border-zinc-800/80 mb-5 shadow-sm">
+        {/* Row 1: Deck Title + Quick Actions */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Колода</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl md:text-2xl font-bold text-zinc-200">{deck.name}</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-zinc-100 truncate">{deck.name}</h2>
               {onEditDeck && (
                 <button
                   onClick={() => onEditDeck(deck)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
-                  title="Редактировать / переместить в папку"
+                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Редактировать колоду"
                 >
-                  <Pencil className="w-4 h-4" />
+                  <Pencil className="w-3.5 h-3.5" />
                 </button>
               )}
               {onDeleteDeck && (
@@ -124,53 +125,82 @@ export const DeckView: React.FC<DeckViewProps> = ({
                       onDeleteDeck(deck.id);
                     }
                   }}
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="p-1 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Удалить колоду"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
             {deck.description && (
-              <p className="text-xs md:text-sm text-zinc-400 mt-1">{deck.description}</p>
+              <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{deck.description}</p>
             )}
           </div>
 
-          <div className="flex items-center flex-wrap gap-2.5">
-            {/* Primary Action 1: Mass Import List */}
-            <button
-              onClick={onOpenImport}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-zinc-100 text-xs font-medium transition-colors cursor-pointer border border-zinc-700/80 shadow-sm"
-              title="Вставить сразу список из 100+ фраз от нейросети"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
-              <span>Импорт списка (из нейросети)</span>
-            </button>
-
-            {/* Minor Action: Add 1 Card */}
+          {/* Quick Actions (Add word / Import) */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => onAddCard(deck.id)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer border border-zinc-800"
-              title="Создать 1 карточку вручную"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-750 transition-colors cursor-pointer"
+              title="Добавить карточку вручную"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ 1 шт.</span>
+              <span>Слово</span>
             </button>
+            <button
+              onClick={onOpenImport}
+              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
+              title="Импорт списка из нейросети"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
 
-            {/* Direction Mode Selector */}
+        {/* Row 2: Hero Study Button */}
+        <div className="mt-4">
+          <button
+            onClick={() => onStartStudy(deck.id, directionMode, settings.sessionLimit)}
+            disabled={deckCards.length === 0}
+            className={`w-full py-3 px-5 rounded-xl font-semibold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-md active:scale-[0.99] ${
+              deckCards.length === 0
+                ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-800'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950'
+            }`}
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>
+              {stats.totalNeedReview > 0 
+                ? settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
+                  ? `Учить (${settings.sessionDurationMinutes} мин)`
+                  : settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
+                    ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
+                    : `Учить (${stats.totalNeedReview} шт.)`
+                : 'Повторить колоду'}
+            </span>
+          </button>
+        </div>
+
+        {/* Row 3: Compact Settings Strip (Direction & Batch Size) */}
+        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+          {/* Direction selector */}
+          <div className="flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800/80 rounded-xl px-2.5 py-1.5 text-zinc-400">
+            <span className="text-[11px] text-zinc-500 shrink-0">Режим:</span>
             <select
               value={directionMode}
               onChange={(e) => handleDirectionChange(e.target.value as DirectionMode)}
-              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 text-xs border border-zinc-800 outline-none cursor-pointer focus:border-zinc-700 transition-colors"
-              title="Направление изучения карточек"
+              className="bg-transparent border-none text-zinc-200 text-xs focus:outline-none cursor-pointer w-full truncate pr-1"
             >
-              <option value="adaptive">Адаптивный (En ⇄ Ru)</option>
-              <option value="random">Случайный (50 / 50)</option>
-              <option value="ru_en">RU → EN (Говорение)</option>
-              <option value="en_ru">EN → RU (Аудирование)</option>
+              <option value="adaptive" className="bg-zinc-900">Адаптивный (En ⇄ Ru)</option>
+              <option value="random" className="bg-zinc-900">Случайный (50 / 50)</option>
+              <option value="ru_en" className="bg-zinc-900">RU → EN (Говорение)</option>
+              <option value="en_ru" className="bg-zinc-900">EN → RU (Аудирование)</option>
             </select>
+          </div>
 
-            {/* Session Batch Limit or Duration Selector */}
+          {/* Batch size selector */}
+          <div className="flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800/80 rounded-xl px-2.5 py-1.5 text-zinc-400">
+            <span className="text-[11px] text-zinc-500 shrink-0">Порция:</span>
             <select
               value={
                 settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
@@ -196,103 +226,58 @@ export const DeckView: React.FC<DeckViewProps> = ({
                   });
                 }
               }}
-              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 text-xs border border-zinc-800 outline-none cursor-pointer focus:border-zinc-700 transition-colors font-mono"
-              title="Режим тренировки: по времени или по количеству карточек"
+              className="bg-transparent border-none text-zinc-200 text-xs focus:outline-none cursor-pointer w-full truncate pr-1 font-mono"
             >
               <optgroup label="По времени:">
-                <option value="time_5">5 минут (~12 карт)</option>
-                <option value="time_10">10 минут (~25 карт)</option>
-                <option value="time_15">15 минут (~35 карт)</option>
-                <option value="time_20">20 минут (~50 карт)</option>
+                <option value="time_5" className="bg-zinc-900">5 минут (~12 карт)</option>
+                <option value="time_10" className="bg-zinc-900">10 минут (~25 карт)</option>
+                <option value="time_15" className="bg-zinc-900">15 минут (~35 карт)</option>
+                <option value="time_20" className="bg-zinc-900">20 минут (~50 карт)</option>
               </optgroup>
               <optgroup label="По количеству:">
-                <option value={5}>5 карточек</option>
-                <option value={10}>10 карточек</option>
-                <option value={20}>20 карточек</option>
-                <option value={30}>30 карточек</option>
-                <option value={50}>50 карточек</option>
-                <option value={0}>Без лимита</option>
+                <option value={5} className="bg-zinc-900">5 карточек</option>
+                <option value={10} className="bg-zinc-900">10 карточек</option>
+                <option value={20} className="bg-zinc-900">20 карточек</option>
+                <option value={30} className="bg-zinc-900">30 карточек</option>
+                <option value={50} className="bg-zinc-900">50 карточек</option>
+                <option value={0} className="bg-zinc-900">Без лимита</option>
               </optgroup>
             </select>
-
-            {/* Primary Action 2: Study */}
-            <button
-              onClick={() => onStartStudy(deck.id, directionMode, settings.sessionLimit)}
-              disabled={deckCards.length === 0}
-              className={`flex items-center gap-2 px-5 py-2 rounded-xl font-medium text-xs transition-all cursor-pointer ${
-                deckCards.length === 0
-                  ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-800'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950 shadow-md active:scale-[0.98]'
-              }`}
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>
-                {stats.totalNeedReview > 0 
-                  ? settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
-                    ? `Учить (${settings.sessionDurationMinutes} мин)`
-                    : settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
-                      ? `Учить (${settings.sessionLimit} из ${stats.totalNeedReview} шт.)`
-                      : `Учить (${stats.totalNeedReview} шт.)`
-                  : 'Повторить колоду'}
-              </span>
-            </button>
           </div>
         </div>
 
-        {/* FSRS Mini Statistics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-zinc-800/60 text-xs">
-          <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">К повторению сегодня</div>
-            <div className="text-lg font-bold text-amber-400 font-mono">{stats.dueCount}</div>
-          </div>
-          <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">Новые слова</div>
-            <div className="text-lg font-bold text-blue-400 font-mono">{stats.newCount}</div>
-          </div>
-          <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">В активе (освоено)</div>
-            <div className="text-lg font-bold text-emerald-400 font-mono">
-              {stats.activeCount} <span className="text-xs text-zinc-500 font-normal">из {stats.total}</span>
+        {/* Row 4: Clean Progress Card */}
+        <div className="mt-4 pt-3.5 border-t border-zinc-800/60">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-zinc-400">
+              Освоено: <strong className="text-zinc-200 font-mono">{stats.activeCount} из {stats.total}</strong> ({Math.round((stats.activeCount / Math.max(1, stats.total)) * 100)}%)
+            </span>
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span className="text-amber-400">{stats.dueCount} повт.</span>
+              <span className="text-zinc-600">·</span>
+              <span className="text-blue-400">{stats.newCount} новых</span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="text-zinc-500 text-[11px] mb-1">Всего в колоде</div>
-            <div className="text-lg font-bold text-zinc-300 font-mono">{stats.total}</div>
+          <div className="w-full h-1.5 rounded-full bg-zinc-850 overflow-hidden">
+            <div
+              className="h-full bg-zinc-300 rounded-full transition-all duration-500"
+              style={{ width: `${Math.round((stats.activeCount / Math.max(1, stats.total)) * 100)}%` }}
+            />
           </div>
         </div>
 
-        {/* Study Pace Forecast Banner with Simulator Trigger */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/60 mt-4 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 flex-shrink-0">
-              <Target className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-zinc-200 font-medium">
-                {stats.dueCount === 0 && stats.newCount === 0 ? (
-                  <span>Все слова колоды освоены и повторены</span>
-                ) : (
-                  <span>
-                    При темпе {settings.dailyGoal || 20} карт/день: финиш через{' '}
-                    <strong className="text-emerald-400 font-mono">
-                      {Math.ceil((stats.dueCount + stats.newCount) / (settings.dailyGoal || 20))} дн.
-                    </strong>
-                  </span>
-                )}
-              </div>
-              <div className="text-zinc-500 text-[11px]">
-                {stats.dueCount === 0 && stats.newCount === 0
-                  ? 'Колода чиста! Отдыхайте до завтра.'
-                  : `Осталось: ${stats.dueCount} повторений + ${stats.newCount} новых (${stats.dueCount + stats.newCount} шт.)`}
-              </div>
-            </div>
-          </div>
+        {/* Row 5: Subtle Pace Info with Simulator Trigger */}
+        <div className="flex items-center justify-between text-xs text-zinc-500 mt-2.5">
+          <span className="text-[11px] truncate">
+            {stats.dueCount === 0 && stats.newCount === 0
+              ? 'Колода чиста! Отдыхайте до завтра.'
+              : `Темп ${settings.dailyGoal || 20} карт/день: финиш через ${Math.ceil((stats.dueCount + stats.newCount) / (settings.dailyGoal || 20))} дн.`}
+          </span>
           <button
             onClick={() => setIsSimulatorOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors border border-zinc-700/60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+            className="text-[11px] text-zinc-400 hover:text-zinc-200 underline ml-2 shrink-0 cursor-pointer"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Симулятор темпа</span>
+            Симулятор темпа
           </button>
         </div>
       </div>
