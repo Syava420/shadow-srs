@@ -75,7 +75,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                🇺🇸 Американский (US Natural)
+                Американский (US Natural)
               </button>
               <button
                 type="button"
@@ -86,7 +86,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                🇬🇧 Британский (UK Oxford)
+                Британский (UK Oxford)
               </button>
             </div>
           </div>
@@ -162,13 +162,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }}
               className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-xl px-3 py-1.5 outline-none font-mono cursor-pointer"
             >
-              <optgroup label="⏱️ По времени (таймер):">
-                <option value="time_5">⚡ 5 минут (~12 карт)</option>
-                <option value="time_10">⏱️ 10 минут (~25 карт)</option>
-                <option value="time_15">⏱️ 15 минут (~35 карт)</option>
-                <option value="time_20">🔥 20 минут (~50 карт)</option>
+              <optgroup label="По времени (таймер):">
+                <option value="time_5">5 минут (~12 карт)</option>
+                <option value="time_10">10 минут (~25 карт)</option>
+                <option value="time_15">15 минут (~35 карт)</option>
+                <option value="time_20">20 минут (~50 карт)</option>
               </optgroup>
-              <optgroup label="🎯 По количеству карт:">
+              <optgroup label="По количеству карт:">
                 <option value={5}>5 карточек (экспресс)</option>
                 <option value={10}>10 карточек</option>
                 <option value={20}>20 карточек (стандарт)</option>
@@ -194,6 +194,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="checkbox"
               checked={localSettings.autoPlayAudio}
               onChange={(e) => setLocalSettings({ ...localSettings, autoPlayAudio: e.target.checked })}
+              className="w-4 h-4 accent-zinc-200 rounded cursor-pointer"
+            />
+          </label>
+
+          <label className="flex items-center justify-between cursor-pointer py-1">
+            <div>
+              <span className="text-xs text-zinc-300 block">
+                Произношение русскими буквами
+              </span>
+              <span className="text-[11px] text-zinc-500 block">
+                Подсказка для начинающих под английским текстом
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={localSettings.showTranscription ?? true}
+              onChange={(e) => setLocalSettings({ ...localSettings, showTranscription: e.target.checked })}
               className="w-4 h-4 accent-zinc-200 rounded cursor-pointer"
             />
           </label>

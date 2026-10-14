@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   speechRate: 1.0,
   autoPlayAudio: true,
   showImages: true,
+  showTranscription: true,
   dailyGoal: 20,
   sessionLimit: 20,
   sessionDurationMinutes: 0,

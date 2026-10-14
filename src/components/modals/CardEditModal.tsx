@@ -6,6 +6,7 @@ import { FlashCard } from '@/types';
 import { createNewFSRSCard } from '@/lib/fsrs';
 import { generateThematicSvg } from '@/lib/image-service';
 import { tts } from '@/lib/tts';
+import { getRussianTranscription } from '@/lib/transcription';
 
 interface CardEditModalProps {
   isOpen: boolean;
@@ -26,16 +27,19 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
 }) => {
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+  const [transcription, setTranscription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
     if (cardToEdit) {
       setFront(cardToEdit.front);
       setBack(cardToEdit.back);
+      setTranscription(cardToEdit.transcription || '');
       setImageUrl(cardToEdit.imageUrl || '');
     } else {
       setFront('');
       setBack('');
+      setTranscription('');
       setImageUrl('');
     }
   }, [cardToEdit, isOpen]);
@@ -80,6 +84,7 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
       deckId: cardToEdit?.deckId || deckId,
       front: front.trim(),
       back: back.trim(),
+      transcription: transcription.trim() || undefined,
       imageUrl: imageUrl.trim() || generateThematicSvg(back.trim()),
       fsrsCard: cardToEdit?.fsrsCard || createNewFSRSCard(),
       createdAt: cardToEdit?.createdAt || Date.now(),
@@ -109,7 +114,7 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-xs font-medium text-zinc-400">
-              🇷🇺 Вопрос (Русский текст)
+              Вопрос (Русский текст)
             </label>
             <button
               type="button"
@@ -134,7 +139,7 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-xs font-medium text-zinc-400">
-              🇺🇸 Ответ (Английский текст)
+              Ответ (Английский текст)
             </label>
             {back.trim() && (
               <button
@@ -152,6 +157,32 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
             value={back}
             onChange={(e) => setBack(e.target.value)}
             placeholder="Например: Don't take it to heart"
+            className="w-full bg-[#09090b] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+          />
+        </div>
+
+        {/* Phonetic Pronunciation (Russian letters) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-medium text-zinc-400">
+              Произношение русскими буквами (для начинающих)
+            </label>
+            {back.trim() && (
+              <button
+                type="button"
+                onClick={() => setTranscription(getRussianTranscription(back))}
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Автоматически рассчитать транскрипцию"
+              >
+                Автозаполнение
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={transcription}
+            onChange={(e) => setTranscription(e.target.value)}
+            placeholder="Оставьте пустым для автогенерации, например: [до́унт тэйк ит ту харт]"
             className="w-full bg-[#09090b] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
           />
         </div>

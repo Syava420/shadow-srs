@@ -111,6 +111,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       deckId: targetDeckId,
       front: item.front,
       back: item.back,
+      transcription: item.transcription,
       imageUrl: autoAttachImages ? generateThematicSvg(item.back) : undefined,
       fsrsCard: createNewFSRSCard(),
       createdAt: Date.now() + idx,
@@ -280,13 +281,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                     </span>
 
                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                      <span className="truncate max-w-[42%] text-zinc-400">
+                      <span className="truncate max-w-[36%] text-zinc-400">
                         {item.front}
                       </span>
                       <span className="text-zinc-600 flex-shrink-0">→</span>
-                      <span className="truncate max-w-[42%] font-medium text-zinc-200">
+                      <span className="truncate max-w-[36%] font-medium text-zinc-200">
                         {item.back}
                       </span>
+                      {item.transcription && (
+                        <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline truncate max-w-[28%]">
+                          {item.transcription}
+                        </span>
+                      )}
                     </div>
 
                     {item.isDuplicate && (

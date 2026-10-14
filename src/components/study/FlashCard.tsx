@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Volume2, RotateCcw, Pencil } from 'lucide-react';
 import { FlashCard as FlashCardType } from '@/types';
 import { tts } from '@/lib/tts';
+import { getRussianTranscription } from '@/lib/transcription';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -17,6 +18,7 @@ interface FlashCardProps {
   showImages: boolean;
   voiceAccent: 'en-US' | 'en-GB';
   speechRate: number;
+  showTranscription?: boolean;
 }
 
 export const FlashCard: React.FC<FlashCardProps> = ({
@@ -29,6 +31,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   showImages,
   voiceAccent,
   speechRate,
+  showTranscription = true,
 }) => {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -63,6 +66,13 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   const isRuToEn = direction === 'ru_to_en';
   const questionText = isRuToEn ? card.front : card.back;
   const answerText = isRuToEn ? card.back : card.front;
+
+  const rawTranscription = (card.transcription && card.transcription.trim())
+    ? card.transcription.trim()
+    : getRussianTranscription(card.back);
+  const displayTranscription = rawTranscription
+    ? (rawTranscription.startsWith('[') ? rawTranscription : `[${rawTranscription}]`)
+    : '';
 
   const handleReplayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -209,6 +219,11 @@ export const FlashCard: React.FC<FlashCardProps> = ({
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-medium text-zinc-100 leading-relaxed max-w-2xl mx-auto">
               {questionText}
             </h2>
+            {!isRuToEn && showTranscription && displayTranscription && (
+              <p className="text-sm sm:text-base text-zinc-400 mt-3 font-mono tracking-wide">
+                {displayTranscription}
+              </p>
+            )}
           </div>
 
           <div className="text-[11px] font-mono text-zinc-600">
@@ -275,11 +290,21 @@ export const FlashCard: React.FC<FlashCardProps> = ({
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-zinc-100 tracking-wide max-w-2xl">
               {answerText}
             </h2>
+            {isRuToEn && showTranscription && displayTranscription && (
+              <p className="text-sm sm:text-base text-zinc-400 mt-3 font-mono tracking-wide">
+                {displayTranscription}
+              </p>
+            )}
           </div>
 
           {/* Question Reminder at bottom */}
           <div className="text-center text-xs text-zinc-400 max-w-lg">
-            {questionText}
+            <span>{questionText}</span>
+            {!isRuToEn && showTranscription && displayTranscription && (
+              <span className="block text-[11px] text-zinc-500 font-mono mt-0.5">
+                {displayTranscription}
+              </span>
+            )}
           </div>
         </div>
       </div>

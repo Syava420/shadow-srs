@@ -396,6 +396,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
           showImages={settings.showImages}
           voiceAccent={settings.voiceAccent}
           speechRate={settings.speechRate}
+          showTranscription={settings.showTranscription ?? true}
         />
       </div>
 

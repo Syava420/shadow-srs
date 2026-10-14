@@ -21,6 +21,7 @@ export interface FlashCard {
   deckId: string;
   front: string; // Russian (Question)
   back: string;  // English (Answer & Pronunciation)
+  transcription?: string; // Russian pronunciation hint: e.g. [до́тэ]
   imageUrl?: string;
   audioUrl?: string;
   fsrsCard: FSRSCard; // FSRS state: due, stability, difficulty, reps, lapses, state
@@ -34,6 +35,7 @@ export interface AppSettings {
   speechRate: number; // 0.7 to 1.3, default 1.0
   autoPlayAudio: boolean; // Auto play when flipped to English
   showImages: boolean;
+  showTranscription: boolean; // Show Russian pronunciation guide under English text
   dailyGoal: number; // default 20
   sessionLimit: number; // default 20 (0 = unlimited)
   sessionDurationMinutes?: number; // 0 = by card count, 5 = 5 min, 10 = 10 min, etc.
@@ -43,6 +45,7 @@ export interface ImportPreviewItem {
   id: string;
   front: string;
   back: string;
+  transcription?: string;
   selected: boolean;
   isDuplicate?: boolean;
 }

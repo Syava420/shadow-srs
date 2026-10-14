@@ -1,4 +1,5 @@
 import { ImportPreviewItem } from '@/types';
+import { getRussianTranscription } from '@/lib/transcription';
 
 // Regex tests for language detection
 const CYRILLIC_REGEX = /[\u0400-\u04FF]/;
@@ -121,13 +122,31 @@ export function parsePastedText(rawText: string): ImportPreviewItem[] {
 
       if (cleanA && cleanB) {
         const isA_Russian = isRussianText(cleanA);
-        const front = isA_Russian ? cleanA : cleanB;
-        const back = isA_Russian ? cleanB : cleanA;
+        let front = isA_Russian ? cleanA : cleanB;
+        let back = isA_Russian ? cleanB : cleanA;
+        let transcription = '';
+
+        // Extract bracketed Russian pronunciation if present in English string, e.g. "Daughter [до́тэ]"
+        const bracketMatch = back.match(/\[(.*?)\]|\((.*?)\)/);
+        if (bracketMatch) {
+          const inner = bracketMatch[1] || bracketMatch[2];
+          // If the bracketed text contains Cyrillic, it's a pronunciation hint!
+          if (CYRILLIC_REGEX.test(inner)) {
+            transcription = `[${inner.trim()}]`;
+            back = back.replace(bracketMatch[0], '').trim();
+          }
+        }
+
+        // If no explicit transcription provided, auto-generate it from back text
+        if (!transcription) {
+          transcription = getRussianTranscription(back);
+        }
 
         items.push({
           id: `import-${Date.now()}-${items.length}-${Math.random().toString(36).substring(2, 6)}`,
           front,
           back,
+          transcription,
           selected: true,
         });
       }
