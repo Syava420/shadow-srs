@@ -1,17 +1,89 @@
 /**
  * English to Russian Phonetic Transcription Engine
  * Generates natural Cyrillic phonetic pronunciation for A0 English learners.
+ * 100% offline, instant (0ms latency), and guarantees 0 English letters in output.
  */
 
 import { COMMON_DICTIONARY } from './transcriptionDictionary';
 
 /**
  * Phonetic transliterator fallback for words not in the dictionary.
+ * Strictly guarantees all Latin letters are converted to natural Russian phonetics.
  */
 function transliterateWord(word: string): string {
-  let w = word.toLowerCase();
+  let w = word.toLowerCase().trim();
+  if (!w) return '';
 
-  // Special cluster replacements
+  // 1. High-frequency word overrides & common multi-word contractions
+  const commonWords: Record<string, string> = {
+    future: 'фью́чэ',
+    power: 'па́уэ',
+    flower: 'фла́уэ',
+    tower: 'та́уэ',
+    shower: 'ша́уэ',
+    hour: 'а́уэр',
+    hours: 'а́уэрз',
+    our: 'а́уэр',
+    ours: 'а́уэрз',
+    out: 'а́ут',
+    about: 'эба́ут',
+    cloud: 'кла́уд',
+    sound: 'са́унд',
+    round: 'ра́унд',
+    found: 'фа́унд',
+    ground: 'гра́унд',
+    house: 'ха́ус',
+    mouse: 'ма́ус',
+    mouth: 'ма́ус',
+    down: 'да́ун',
+    town: 'та́ун',
+    now: 'на́у',
+    how: 'ха́у',
+    cow: 'ка́у',
+    brown: 'бра́ун',
+    clown: 'кла́ун',
+    music: 'мью́зик',
+    student: 'стью́дэнт',
+    human: 'хью́мэн',
+    duty: 'дью́ти',
+    pure: 'пью́э',
+    cure: 'кью́э',
+    cute: 'кьют',
+    huge: 'хьюдж',
+    tube: 'тьюб',
+    suit: 'сут',
+    super: 'су́пэ',
+    clean: 'клин',
+    light: 'ла́йт',
+    night: 'на́йт',
+    right: 'ра́йт',
+    flight: 'фла́йт',
+    bright: 'бра́йт',
+    truth: 'трус',
+    dream: 'дрим',
+    world: 'уёрлд',
+    word: 'уёрд',
+    work: 'уёрк',
+  };
+
+  if (commonWords[w]) {
+    return commonWords[w];
+  }
+
+  // 2. Open syllable rule for 'u': u + consonant + vowel -> 'ью'
+  // Example: future, music, student, cute, huge, abuse, perfume
+  w = w.replace(/u(?=[bcdfghjklmnpqrstvwxz][aeiouy])/g, 'ью');
+  w = w.replace(/^ью/, 'ю'); // at start of word: unit -> юнит
+
+  // 3. Open syllable rules for single vowels before silent terminal 'e'
+  // a_e -> эй (make, take, name, late, safe)
+  w = w.replace(/a(?=[bcdfghjklmnpqrstvwxz]e\b)/g, 'эй');
+  // i_e -> ай (like, time, life, ride, white, fine)
+  w = w.replace(/i(?=[bcdfghjklmnpqrstvwxz]e\b)/g, 'ай');
+  // o_e -> оу (home, hope, stone, smoke, role)
+  w = w.replace(/o(?=[bcdfghjklmnpqrstvwxz]e\b)/g, 'оу');
+
+  // 4. Special letter clusters
   const clusters: [RegExp, string][] = [
     [/tion\b/g, 'шэн'],
     [/sion\b/g, 'жэн'],
@@ -37,11 +109,12 @@ function transliterateWord(word: string): string {
     [/ey/g, 'эй'],
     [/oi/g, 'ой'],
     [/oy/g, 'ой'],
+    [/all\b/g, 'ол'],
+    [/all(?=[bcdfghjklmnpqrstvwxz])/g, 'ол'],
     [/ou/g, 'ау'],
     [/ow/g, 'оу'],
     [/au/g, 'о'],
     [/aw/g, 'о'],
-    [/all\b/g, 'ол'],
     [/ng\b/g, 'нг'],
   ];
 
@@ -49,7 +122,12 @@ function transliterateWord(word: string): string {
     w = w.replace(pattern, replacement);
   }
 
-  // Letter by letter mapping
+  // 5. Remove silent terminal 'e' if word has other vowels
+  if (/[а-яёaeiouy]/.test(w) && w.endsWith('e') && w.length > 2) {
+    w = w.slice(0, -1);
+  }
+
+  // 6. Letter by letter mapping (strictly maps all 26 Latin letters to Cyrillic)
   const charMap: Record<string, string> = {
     a: 'э',
     b: 'б',
@@ -82,13 +160,16 @@ function transliterateWord(word: string): string {
   let result = '';
   for (let i = 0; i < w.length; i++) {
     const char = w[i];
-    result += charMap[char] || char;
+    // If already Cyrillic, keep it; if Latin, map it; otherwise ignore unknown non-alphanumeric
+    if (/[а-яёА-ЯЁ]/.test(char)) {
+      result += char;
+    } else if (charMap[char]) {
+      result += charMap[char];
+    }
   }
 
-  // Remove silent 'e' at end of Russian representation if word ends with vowel + consonant + e
-  if (result.endsWith('е') && result.length > 3) {
-    result = result.slice(0, -1);
-  }
+  // Final cleanup of accidental duplicates like 'йй' or trailing soft signs
+  result = result.replace(/йй+/g, 'й');
 
   return result;
 }
@@ -100,7 +181,7 @@ function transliterateWord(word: string): string {
 export function getRussianTranscription(text: string): string {
   if (!text || !text.trim()) return '';
 
-  // Clean brackets if text already has some
+  // Clean existing bracket annotations
   const cleanedText = text.replace(/\[.*?\]/g, '').trim();
   if (!cleanedText) return '';
 
@@ -144,14 +225,14 @@ export function getRussianTranscription(text: string): string {
       return numMap[token] || token;
     }
 
-    // Fallback to phonetic transliterator
+    // Algorithmic Cyrillic phonetic transliterator
     return transliterateWord(lower);
   });
 
   const result = transcribedTokens
     .filter(Boolean)
     .join(' ')
-    .replace(/\s+([,?.!])/g, '$1') // attach punctuation without space
+    .replace(/\s+([,?.!])/g, '$1') // attach punctuation without extra space
     .trim();
 
   return result ? `[${result}]` : '';

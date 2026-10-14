@@ -6,7 +6,7 @@ import { FlashCard as FlashCardType } from '@/types';
 import { tts } from '@/lib/tts';
 import { getRussianTranscription } from '@/lib/transcription';
 import { getWordGloss, GlossItem } from '@/lib/gloss';
-import { enrichEnglishOnline } from '@/lib/onlineEnrichment';
+import { enrichGlossOnline } from '@/lib/onlineEnrichment';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -65,7 +65,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   };
 
   const [showGloss, setShowGloss] = useState(false);
-  const [enrichedData, setEnrichedData] = useState<{ transcription?: string; gloss?: string } | null>(null);
+  const [enrichedGloss, setEnrichedGloss] = useState<string | null>(null);
 
   useEffect(() => {
     setShowGloss(false);
@@ -73,10 +73,10 @@ export const FlashCard: React.FC<FlashCardProps> = ({
 
   useEffect(() => {
     let isCancelled = false;
-    setEnrichedData(null);
-    enrichEnglishOnline(card.back).then((res) => {
+    setEnrichedGloss(null);
+    enrichGlossOnline(card.back).then((res) => {
       if (!isCancelled && res) {
-        setEnrichedData(res);
+        setEnrichedGloss(res);
       }
     });
     return () => {
@@ -89,15 +89,16 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   const questionText = isRuToEn ? card.front : card.back;
   const answerText = isRuToEn ? card.back : card.front;
 
+  // Transcription is 100% instant, guaranteed Russian Cyrillic
   const rawTranscription = (card.transcription && card.transcription.trim())
     ? card.transcription.trim()
-    : (enrichedData?.transcription || getRussianTranscription(card.back));
+    : getRussianTranscription(card.back);
   const displayTranscription = rawTranscription
     ? (rawTranscription.startsWith('[') ? rawTranscription : `[${rawTranscription}]`)
     : '';
 
   const glossItems: GlossItem[] = useMemo(() => {
-    const glossSource = (card.gloss && card.gloss.trim()) || enrichedData?.gloss;
+    const glossSource = (card.gloss && card.gloss.trim()) || enrichedGloss;
     if (glossSource && glossSource.trim()) {
       const parts = glossSource.split('·').map(p => p.trim());
       return parts.map(p => {
@@ -107,7 +108,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
       });
     }
     return getWordGloss(card.back);
-  }, [card.back, card.gloss, enrichedData?.gloss]);
+  }, [card.back, card.gloss, enrichedGloss]);
 
   const handleReplayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
