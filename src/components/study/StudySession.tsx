@@ -211,7 +211,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     // 1. Calculate active seconds spent (capped at 45s)
     const elapsedSecs = Math.min(45, (Date.now() - cardStartTimeRef.current) / 1000);
-    storage.recordReviewActivity(elapsedSecs);
+    storage.recordReviewActivity(elapsedSecs, isRemembered);
 
     // 2. Schedule via FSRS
     const updated = scheduleCardReview(currentCard, isRemembered, elapsedSecs);

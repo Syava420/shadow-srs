@@ -170,14 +170,17 @@ export const storage = {
   /**
    * Records a completed card review, tracks streak and capped active study time
    */
-  recordReviewActivity(seconds: number): void {
+  recordReviewActivity(seconds: number, isRemembered?: boolean): void {
     const stats = this.getStats();
     const today = getTodayString();
     const clampedSecs = Math.min(45, Math.max(1, Math.round(seconds)));
 
-    const todayEntry = stats.dailyHistory[today] || { cardsReviewed: 0, activeSeconds: 0 };
-    todayEntry.cardsReviewed += 1;
-    todayEntry.activeSeconds += clampedSecs;
+    const todayEntry = stats.dailyHistory[today] || { cardsReviewed: 0, activeSeconds: 0, rememberedCount: 0 };
+    todayEntry.cardsReviewed = (todayEntry.cardsReviewed || 0) + 1;
+    todayEntry.activeSeconds = (todayEntry.activeSeconds || 0) + clampedSecs;
+    if (isRemembered) {
+      todayEntry.rememberedCount = (todayEntry.rememberedCount || 0) + 1;
+    }
 
     // Calculate streak
     let streak = stats.streakDays || 1;

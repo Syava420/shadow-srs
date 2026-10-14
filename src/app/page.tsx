@@ -431,6 +431,7 @@ export default function HomePage() {
         isOpen={isStatsOpen}
         stats={stats}
         cards={cards}
+        settings={settings}
         onClose={() => setIsStatsOpen(false)}
       />
 

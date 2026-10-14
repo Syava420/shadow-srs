@@ -55,6 +55,7 @@ export interface ImportPreviewItem {
 export interface DailyActivity {
   cardsReviewed: number;
   activeSeconds: number;
+  rememberedCount?: number;
 }
 
 export interface AppStats {
