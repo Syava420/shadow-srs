@@ -41,7 +41,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const secs = Math.round(totalSeconds % 60);
     if (hours > 0) return `${hours} ч ${minutes} мин`;
-    if (minutes > 0) return `${minutes} мин ${secs} с`;
+    if (minutes > 0) return `${minutes} мин`;
     return `${secs} с`;
   };
 
@@ -49,10 +49,11 @@ export const StatsModal: React.FC<StatsModalProps> = ({
   const todayEntry = stats.dailyHistory[todayStr] || { cardsReviewed: 0, activeSeconds: 0, rememberedCount: 0 };
   const dailyGoal = settings?.dailyGoal || 20;
   const todayGoalPercent = Math.min(100, Math.round((todayEntry.cardsReviewed / dailyGoal) * 100));
+  const hasRememberedData = todayEntry.rememberedCount !== undefined;
   const todayRemembered = todayEntry.rememberedCount ?? 0;
-  const todayWinrate = todayEntry.cardsReviewed > 0 && todayEntry.rememberedCount !== undefined
+  const todayWinrate = todayEntry.cardsReviewed > 0 && hasRememberedData
     ? Math.round((todayRemembered / todayEntry.cardsReviewed) * 100)
-    : (todayEntry.cardsReviewed > 0 ? 100 : null);
+    : null;
 
   // Mastery levels breakdown
   let mastered100 = 0;
@@ -144,7 +145,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
             {/* Active focus time */}
             <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60 text-center">
               <div className="text-[11px] text-zinc-500 mb-0.5">В фокусе</div>
-              <div className="text-lg font-bold font-mono text-zinc-100 truncate">
+              <div className="text-lg font-bold font-mono text-zinc-100">
                 {formatTime(todayEntry.activeSeconds)}
               </div>
               <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
@@ -159,7 +160,11 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                 {todayWinrate !== null ? `${todayWinrate}%` : '—'}
               </div>
               <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate">
-                {todayEntry.cardsReviewed > 0 ? `${todayRemembered}/${todayEntry.cardsReviewed} вспомнил` : 'нет повторений'}
+                {hasRememberedData && todayEntry.cardsReviewed > 0
+                  ? `${todayRemembered} из ${todayEntry.cardsReviewed}`
+                  : todayEntry.cardsReviewed > 0
+                  ? 'с новой сессии'
+                  : 'нет повторений'}
               </div>
             </div>
           </div>

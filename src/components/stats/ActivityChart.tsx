@@ -77,18 +77,18 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
     <div className="p-4 rounded-2xl bg-[#09090b] border border-zinc-800/80 space-y-3">
       {/* Top Header & Range Switcher */}
       <div className="flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-1.5 font-semibold text-zinc-200">
-          <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-          <span>Динамика активности</span>
+        <div className="flex items-center gap-1.5 font-semibold text-zinc-200 truncate">
+          <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span className="truncate">Динамика активности</span>
         </div>
 
-        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
+        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 shrink-0">
           {(['7', '14', '30'] as TimeRange[]).map((r) => (
             <button
               key={r}
               type="button"
               onClick={() => setRange(r)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors whitespace-nowrap cursor-pointer ${
                 range === r
                   ? 'bg-zinc-800 text-zinc-100 font-bold'
                   : 'text-zinc-500 hover:text-zinc-300'
@@ -101,9 +101,9 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       </div>
 
       {/* Period summary */}
-      <div className="text-[11px] text-zinc-500 flex items-center justify-between font-mono">
+      <div className="text-[11px] text-zinc-500 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 font-mono">
         <span>Повторено: <strong className="text-zinc-200">{rangeCardsCount}</strong> карт</span>
-        <span>Чистое время: <strong className="text-zinc-200">{formatTime(rangeSecondsCount)}</strong></span>
+        <span>Время: <strong className="text-zinc-200">{formatTime(rangeSecondsCount)}</strong></span>
       </div>
 
       {/* VIEW A: BAR CHART (7 or 14 days) */}
