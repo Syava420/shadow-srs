@@ -6,6 +6,7 @@ import { FlashCard as FlashCardType } from '@/types';
 import { tts } from '@/lib/tts';
 import { getRussianTranscription } from '@/lib/transcription';
 import { getWordGloss, GlossItem } from '@/lib/gloss';
+import { enrichEnglishOnline } from '@/lib/onlineEnrichment';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -64,10 +65,24 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   };
 
   const [showGloss, setShowGloss] = useState(false);
+  const [enrichedData, setEnrichedData] = useState<{ transcription?: string; gloss?: string } | null>(null);
 
   useEffect(() => {
     setShowGloss(false);
   }, [card.id]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setEnrichedData(null);
+    enrichEnglishOnline(card.back).then((res) => {
+      if (!isCancelled && res) {
+        setEnrichedData(res);
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [card.id, card.back]);
 
   // Decide front/back text based on direction
   const isRuToEn = direction === 'ru_to_en';
@@ -76,14 +91,15 @@ export const FlashCard: React.FC<FlashCardProps> = ({
 
   const rawTranscription = (card.transcription && card.transcription.trim())
     ? card.transcription.trim()
-    : getRussianTranscription(card.back);
+    : (enrichedData?.transcription || getRussianTranscription(card.back));
   const displayTranscription = rawTranscription
     ? (rawTranscription.startsWith('[') ? rawTranscription : `[${rawTranscription}]`)
     : '';
 
   const glossItems: GlossItem[] = useMemo(() => {
-    if (card.gloss && card.gloss.trim()) {
-      const parts = card.gloss.split('·').map(p => p.trim());
+    const glossSource = (card.gloss && card.gloss.trim()) || enrichedData?.gloss;
+    if (glossSource && glossSource.trim()) {
+      const parts = glossSource.split('·').map(p => p.trim());
       return parts.map(p => {
         const match = p.match(/^(.+?)\s*\((.+?)\)$/);
         if (match) return { word: match[1].trim(), gloss: match[2].trim() };
@@ -91,7 +107,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
       });
     }
     return getWordGloss(card.back);
-  }, [card.back, card.gloss]);
+  }, [card.back, card.gloss, enrichedData?.gloss]);
 
   const handleReplayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -271,6 +287,14 @@ export const FlashCard: React.FC<FlashCardProps> = ({
                     e.stopPropagation();
                     setShowGloss((prev) => !prev);
                   }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setShowGloss((prev) => !prev);
+                  }}
                   className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
                     showGloss
                       ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
@@ -383,6 +407,14 @@ export const FlashCard: React.FC<FlashCardProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setShowGloss((prev) => !prev);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
                     setShowGloss((prev) => !prev);
                   }}
                   className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
