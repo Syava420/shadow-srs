@@ -22,6 +22,7 @@ export interface FlashCard {
   front: string; // Russian (Question)
   back: string;  // English (Answer & Pronunciation)
   transcription?: string; // Russian pronunciation hint: e.g. [до́тэ]
+  gloss?: string; // Literal word-by-word translation: e.g. Don't (не) · take (брать)
   imageUrl?: string;
   audioUrl?: string;
   fsrsCard: FSRSCard; // FSRS state: due, stability, difficulty, reps, lapses, state
@@ -46,6 +47,7 @@ export interface ImportPreviewItem {
   front: string;
   back: string;
   transcription?: string;
+  gloss?: string;
   selected: boolean;
   isDuplicate?: boolean;
 }

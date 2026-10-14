@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { Volume2, RotateCcw, Pencil } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Volume2, RotateCcw, Pencil, BookOpen } from 'lucide-react';
 import { FlashCard as FlashCardType } from '@/types';
 import { tts } from '@/lib/tts';
 import { getRussianTranscription } from '@/lib/transcription';
+import { getWordGloss, GlossItem } from '@/lib/gloss';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -62,6 +63,12 @@ export const FlashCard: React.FC<FlashCardProps> = ({
     }
   };
 
+  const [showGloss, setShowGloss] = useState(false);
+
+  useEffect(() => {
+    setShowGloss(false);
+  }, [card.id]);
+
   // Decide front/back text based on direction
   const isRuToEn = direction === 'ru_to_en';
   const questionText = isRuToEn ? card.front : card.back;
@@ -73,6 +80,18 @@ export const FlashCard: React.FC<FlashCardProps> = ({
   const displayTranscription = rawTranscription
     ? (rawTranscription.startsWith('[') ? rawTranscription : `[${rawTranscription}]`)
     : '';
+
+  const glossItems: GlossItem[] = useMemo(() => {
+    if (card.gloss && card.gloss.trim()) {
+      const parts = card.gloss.split('·').map(p => p.trim());
+      return parts.map(p => {
+        const match = p.match(/^(.+?)\s*\((.+?)\)$/);
+        if (match) return { word: match[1].trim(), gloss: match[2].trim() };
+        return { word: p, gloss: '' };
+      });
+    }
+    return getWordGloss(card.back);
+  }, [card.back, card.gloss]);
 
   const handleReplayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -215,7 +234,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
           </div>
 
           {/* Centered Question Text */}
-          <div className="text-center my-auto px-4">
+          <div className="text-center my-auto px-4 w-full">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-medium text-zinc-100 leading-relaxed max-w-2xl mx-auto">
               {questionText}
             </h2>
@@ -224,10 +243,45 @@ export const FlashCard: React.FC<FlashCardProps> = ({
                 {displayTranscription}
               </p>
             )}
+
+            {/* Interlinear Word-by-Word Gloss */}
+            {!isRuToEn && showGloss && glossItems.length > 0 && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-wrap justify-center items-start gap-x-3 gap-y-2 mt-4 px-3.5 py-2.5 rounded-2xl bg-zinc-900/80 border border-zinc-800/80 max-w-xl mx-auto text-center"
+              >
+                {glossItems.map((item, idx) => (
+                  <div key={idx} className="flex flex-col items-center min-w-[36px]">
+                    <span className="text-xs font-medium text-zinc-200">{item.word}</span>
+                    <span className="text-[11px] text-zinc-400 font-normal">{item.gloss}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="text-[11px] font-mono text-zinc-600">
-            клик — переворот · удерживание — ред.
+          <div className="w-full flex items-center justify-between text-[11px] font-mono text-zinc-600">
+            <span className="w-8" />
+            <span className="text-center">клик — переворот · удерживание — ред.</span>
+            <div className="w-8 flex justify-end">
+              {!isRuToEn && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowGloss((prev) => !prev);
+                  }}
+                  className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                    showGloss
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                      : 'bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                  title={showGloss ? 'Скрыть пословный разбор' : 'Пословный дословный разбор'}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -276,7 +330,7 @@ export const FlashCard: React.FC<FlashCardProps> = ({
           </div>
 
           {/* Centered Answer Text + Art */}
-          <div className="my-auto text-center flex flex-col items-center px-4">
+          <div className="my-auto text-center flex flex-col items-center px-4 w-full">
             {showImages && card.imageUrl && (
               <div className="w-48 h-32 sm:w-60 sm:h-40 rounded-2xl overflow-hidden mb-6 border border-zinc-800 shadow-lg bg-zinc-900 flex-shrink-0">
                 <img
@@ -295,16 +349,53 @@ export const FlashCard: React.FC<FlashCardProps> = ({
                 {displayTranscription}
               </p>
             )}
+
+            {/* Interlinear Word-by-Word Gloss */}
+            {isRuToEn && showGloss && glossItems.length > 0 && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-wrap justify-center items-start gap-x-3 gap-y-2 mt-4 px-3.5 py-2.5 rounded-2xl bg-zinc-900/80 border border-zinc-800/80 max-w-xl mx-auto text-center"
+              >
+                {glossItems.map((item, idx) => (
+                  <div key={idx} className="flex flex-col items-center min-w-[36px]">
+                    <span className="text-xs font-medium text-zinc-200">{item.word}</span>
+                    <span className="text-[11px] text-zinc-400 font-normal">{item.gloss}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Question Reminder at bottom */}
-          <div className="text-center text-xs text-zinc-400 max-w-lg">
-            <span>{questionText}</span>
-            {!isRuToEn && showTranscription && displayTranscription && (
-              <span className="block text-[11px] text-zinc-500 font-mono mt-0.5">
-                {displayTranscription}
-              </span>
-            )}
+          {/* Question Reminder & Toggle at bottom */}
+          <div className="w-full flex items-center justify-between text-xs text-zinc-400">
+            <span className="w-8" />
+            <div className="text-center max-w-lg truncate">
+              <span>{questionText}</span>
+              {!isRuToEn && showTranscription && displayTranscription && (
+                <span className="block text-[11px] text-zinc-500 font-mono mt-0.5">
+                  {displayTranscription}
+                </span>
+              )}
+            </div>
+            <div className="w-8 flex justify-end">
+              {isRuToEn && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowGloss((prev) => !prev);
+                  }}
+                  className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                    showGloss
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                      : 'bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                  title={showGloss ? 'Скрыть пословный разбор' : 'Пословный дословный разбор'}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

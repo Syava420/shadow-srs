@@ -7,6 +7,7 @@ import { createNewFSRSCard } from '@/lib/fsrs';
 import { generateThematicSvg } from '@/lib/image-service';
 import { tts } from '@/lib/tts';
 import { getRussianTranscription } from '@/lib/transcription';
+import { formatWordGlossString } from '@/lib/gloss';
 
 interface CardEditModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
   const [transcription, setTranscription] = useState('');
+  const [gloss, setGloss] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
@@ -35,11 +37,13 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
       setFront(cardToEdit.front);
       setBack(cardToEdit.back);
       setTranscription(cardToEdit.transcription || '');
+      setGloss(cardToEdit.gloss || '');
       setImageUrl(cardToEdit.imageUrl || '');
     } else {
       setFront('');
       setBack('');
       setTranscription('');
+      setGloss('');
       setImageUrl('');
     }
   }, [cardToEdit, isOpen]);
@@ -85,6 +89,7 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
       front: front.trim(),
       back: back.trim(),
       transcription: transcription.trim() || undefined,
+      gloss: gloss.trim() || undefined,
       imageUrl: imageUrl.trim() || generateThematicSvg(back.trim()),
       fsrsCard: cardToEdit?.fsrsCard || createNewFSRSCard(),
       createdAt: cardToEdit?.createdAt || Date.now(),
@@ -183,6 +188,32 @@ export const CardEditModal: React.FC<CardEditModalProps> = ({
             value={transcription}
             onChange={(e) => setTranscription(e.target.value)}
             placeholder="Оставьте пустым для автогенерации, например: [до́унт тэйк ит ту харт]"
+            className="w-full bg-[#09090b] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+          />
+        </div>
+
+        {/* Literal Word-by-Word Gloss */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-medium text-zinc-400">
+              Пословный дословный перевод (опционально)
+            </label>
+            {back.trim() && (
+              <button
+                type="button"
+                onClick={() => setGloss(formatWordGlossString(back))}
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Автоматически рассчитать пословный перевод"
+              >
+                Автозаполнение
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={gloss}
+            onChange={(e) => setGloss(e.target.value)}
+            placeholder="Оставьте пустым для автогенерации, например: Don't (не) · take (брать) · it (это)"
             className="w-full bg-[#09090b] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
           />
         </div>
