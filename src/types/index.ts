@@ -53,9 +53,11 @@ export interface ImportPreviewItem {
 }
 
 export interface DailyActivity {
-  cardsReviewed: number;
+  cardsReviewed: number; // Total review attempts (flips / button clicks)
+  uniqueCardIds?: string[]; // IDs of distinct cards studied on this day
   activeSeconds: number;
   rememberedCount?: number;
+  firstTryRememberedIds?: string[]; // IDs of cards remembered on first appearance today
 }
 
 export interface AppStats {

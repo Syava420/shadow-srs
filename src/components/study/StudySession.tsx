@@ -110,8 +110,26 @@ export const StudySession: React.FC<StudySessionProps> = ({
       return effectiveLimit > 0 ? newCards.slice(0, effectiveLimit) : newCards;
     }
 
-    // Fallback if fully caught up: practice learned cards
-    return effectiveLimit > 0 ? cards.slice(0, effectiveLimit) : [...cards];
+    // Fallback if fully caught up: smart practice mode
+    // Prioritize cards closest to fading from memory (lowest retrievability) & difficult cards
+    const practiceCards = [...cards].sort((a, b) => {
+      const retA = calculateRetrievability(a);
+      const retB = calculateRetrievability(b);
+      // If retrievability differs by more than 8%, prioritize the more faded card
+      if (Math.abs(retA - retB) > 8) {
+        return retA - retB;
+      }
+      // Secondary: prioritize cards with more lapses (difficult cards)
+      const lapsesA = a.fsrsCard?.lapses || 0;
+      const lapsesB = b.fsrsCard?.lapses || 0;
+      if (lapsesB !== lapsesA) {
+        return lapsesB - lapsesA;
+      }
+      // Shuffle ties so practice is dynamic and varied
+      return Math.random() - 0.5;
+    });
+
+    return effectiveLimit > 0 ? practiceCards.slice(0, effectiveLimit) : practiceCards;
   }, [cards, cardLimit, durationMins, settings.sessionLimit]);
 
   const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);
@@ -211,7 +229,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     // 1. Calculate active seconds spent (capped at 45s)
     const elapsedSecs = Math.min(45, (Date.now() - cardStartTimeRef.current) / 1000);
-    storage.recordReviewActivity(elapsedSecs, isRemembered);
+    storage.recordReviewActivity(elapsedSecs, isRemembered, currentCard.id);
 
     // 2. Schedule via FSRS
     const updated = scheduleCardReview(currentCard, isRemembered, elapsedSecs);

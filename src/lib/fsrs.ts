@@ -143,14 +143,33 @@ export function getNextIntervalText(card: FlashCard, isRemembered: boolean): str
 }
 
 /**
+ * Returns number of lapses (how many times this card was forgotten)
+ */
+export function getCardLapses(card: FlashCard): number {
+  return card.fsrsCard?.lapses || 0;
+}
+
+/**
+ * Determines if a card is a "leech" / difficult card (forgotten 3+ times)
+ */
+export function isCardDifficult(card: FlashCard): boolean {
+  return (card.fsrsCard?.lapses || 0) >= 3;
+}
+
+/**
  * Calculates statistics for a collection of cards
  */
 export function calculateDeckStats(cards: FlashCard[]) {
   let newCount = 0;
   let dueCount = 0;
   let masteredCount = 0;
+  let difficultCount = 0;
 
   for (const card of cards) {
+    if (isCardDifficult(card)) {
+      difficultCount++;
+    }
+
     if (isCardNew(card)) {
       newCount++;
     } else {
@@ -170,6 +189,7 @@ export function calculateDeckStats(cards: FlashCard[]) {
     total: cards.length,
     newCount,
     dueCount,
+    difficultCount,
     activeCount,
     masteredCount,
     learnedCount: activeCount, // Backward compatibility alias

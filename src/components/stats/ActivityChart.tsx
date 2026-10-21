@@ -32,6 +32,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       weekday: string;
       fullLabel: string;
       count: number;
+      totalAttempts: number;
       seconds: number;
       winrate: number | null;
       isToday: boolean;
@@ -44,6 +45,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       const dateStr = d.toISOString().split('T')[0];
       const dayData = dailyHistory[dateStr] || { cardsReviewed: 0, activeSeconds: 0 };
 
+      const uniqueCount = dayData.uniqueCardIds ? dayData.uniqueCardIds.length : dayData.cardsReviewed;
+      const totalAttempts = dayData.cardsReviewed;
       const remembered = dayData.rememberedCount;
       const winrate = dayData.cardsReviewed > 0 && remembered !== undefined
         ? Math.round((remembered / dayData.cardsReviewed) * 100)
@@ -54,7 +57,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         dayNum: d.getDate(),
         weekday: getShortWeekday(d),
         fullLabel: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
-        count: dayData.cardsReviewed,
+        count: uniqueCount,
+        totalAttempts,
         seconds: dayData.activeSeconds,
         winrate,
         isToday: dateStr === todayStr,
@@ -214,6 +218,9 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           <div className="flex items-center gap-2.5 font-mono text-[11px]">
             <span className="text-zinc-200">
               <strong>{activeSelected.count}</strong> карт
+              {activeSelected.totalAttempts > activeSelected.count && (
+                <span className="text-zinc-500 font-normal"> ({activeSelected.totalAttempts} отв.)</span>
+              )}
             </span>
             <span className="text-zinc-600">·</span>
             <span className="text-zinc-400">{formatTime(activeSelected.seconds)}</span>

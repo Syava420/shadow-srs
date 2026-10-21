@@ -170,16 +170,36 @@ export const storage = {
   /**
    * Records a completed card review, tracks streak and capped active study time
    */
-  recordReviewActivity(seconds: number, isRemembered?: boolean): void {
+  recordReviewActivity(seconds: number, isRemembered?: boolean, cardId?: string): void {
     const stats = this.getStats();
     const today = getTodayString();
     const clampedSecs = Math.min(45, Math.max(1, Math.round(seconds)));
 
-    const todayEntry = stats.dailyHistory[today] || { cardsReviewed: 0, activeSeconds: 0, rememberedCount: 0 };
+    const todayEntry = stats.dailyHistory[today] || { 
+      cardsReviewed: 0, 
+      activeSeconds: 0, 
+      rememberedCount: 0,
+      uniqueCardIds: [],
+      firstTryRememberedIds: [],
+    };
+
     todayEntry.cardsReviewed = (todayEntry.cardsReviewed || 0) + 1;
     todayEntry.activeSeconds = (todayEntry.activeSeconds || 0) + clampedSecs;
+
     if (isRemembered) {
       todayEntry.rememberedCount = (todayEntry.rememberedCount || 0) + 1;
+    }
+
+    if (cardId) {
+      const uniqueList = todayEntry.uniqueCardIds || [];
+      const isFirstAttemptToday = !uniqueList.includes(cardId);
+
+      if (isFirstAttemptToday) {
+        todayEntry.uniqueCardIds = [...uniqueList, cardId];
+        if (isRemembered) {
+          todayEntry.firstTryRememberedIds = [...(todayEntry.firstTryRememberedIds || []), cardId];
+        }
+      }
     }
 
     // Calculate streak

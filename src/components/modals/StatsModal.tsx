@@ -46,14 +46,37 @@ export const StatsModal: React.FC<StatsModalProps> = ({
   };
 
   // Today's metrics
-  const todayEntry = stats.dailyHistory[todayStr] || { cardsReviewed: 0, activeSeconds: 0, rememberedCount: 0 };
+  const todayEntry = stats.dailyHistory[todayStr] || { 
+    cardsReviewed: 0, 
+    activeSeconds: 0, 
+    rememberedCount: 0,
+    uniqueCardIds: [],
+    firstTryRememberedIds: [],
+  };
   const dailyGoal = settings?.dailyGoal || 20;
-  const todayGoalPercent = Math.min(100, Math.round((todayEntry.cardsReviewed / dailyGoal) * 100));
+  const todayUniqueCards = todayEntry.uniqueCardIds ? todayEntry.uniqueCardIds.length : todayEntry.cardsReviewed;
+  const todayTotalReviews = todayEntry.cardsReviewed;
+  const todayGoalPercent = Math.min(100, Math.round((todayUniqueCards / dailyGoal) * 100));
+
+  // Winrate: prefer first-try accuracy on unique cards if available, else overall ratio
+  const hasFirstTryData = todayEntry.firstTryRememberedIds !== undefined && todayEntry.uniqueCardIds !== undefined;
   const hasRememberedData = todayEntry.rememberedCount !== undefined;
-  const todayRemembered = todayEntry.rememberedCount ?? 0;
-  const todayWinrate = todayEntry.cardsReviewed > 0 && hasRememberedData
-    ? Math.round((todayRemembered / todayEntry.cardsReviewed) * 100)
-    : null;
+
+  let todayWinrate: number | null = null;
+  let winrateSubtext = '';
+
+  if (hasFirstTryData && todayUniqueCards > 0) {
+    const firstTryCount = todayEntry.firstTryRememberedIds?.length || 0;
+    todayWinrate = Math.round((firstTryCount / todayUniqueCards) * 100);
+    winrateSubtext = `${firstTryCount} из ${todayUniqueCards}`;
+  } else if (hasRememberedData && todayTotalReviews > 0) {
+    todayWinrate = Math.round((todayEntry.rememberedCount! / todayTotalReviews) * 100);
+    winrateSubtext = `${todayEntry.rememberedCount} из ${todayTotalReviews}`;
+  } else if (todayTotalReviews > 0) {
+    winrateSubtext = 'с новой сессии';
+  } else {
+    winrateSubtext = 'нет повторений';
+  }
 
   // Mastery levels breakdown
   let mastered100 = 0;
@@ -134,11 +157,13 @@ export const StatsModal: React.FC<StatsModalProps> = ({
             <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60 text-center">
               <div className="text-[11px] text-zinc-500 mb-0.5">Карточек</div>
               <div className="text-lg font-bold font-mono text-zinc-100">
-                {todayEntry.cardsReviewed}
+                {todayUniqueCards}
                 <span className="text-xs text-zinc-500 font-normal"> / {dailyGoal}</span>
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
-                {todayGoalPercent}% нормы
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate" title={todayTotalReviews > todayUniqueCards ? `Всего ответов с повторами: ${todayTotalReviews}` : undefined}>
+                {todayTotalReviews > todayUniqueCards
+                  ? `${todayTotalReviews} ответов`
+                  : `${todayGoalPercent}% нормы`}
               </div>
             </div>
 
@@ -160,11 +185,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                 {todayWinrate !== null ? `${todayWinrate}%` : '—'}
               </div>
               <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate">
-                {hasRememberedData && todayEntry.cardsReviewed > 0
-                  ? `${todayRemembered} из ${todayEntry.cardsReviewed}`
-                  : todayEntry.cardsReviewed > 0
-                  ? 'с новой сессии'
-                  : 'нет повторений'}
+                {winrateSubtext}
               </div>
             </div>
           </div>
