@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'shadow_srs_settings',
   STATS: 'shadow_srs_stats',
   UPDATED_AT: 'shadow_srs_updated_at',
+  DELETED_DECKS: 'shadow_srs_deleted_deck_ids',
+  BACKUP: 'shadow_srs_emergency_backup',
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -67,9 +69,23 @@ export const storage = {
     return now;
   },
 
+  getDeletedDeckIds(): string[] {
+    return safeGetItem<string[]>(STORAGE_KEYS.DELETED_DECKS, []);
+  },
+
+  markDeckDeleted(deckId: string): void {
+    const list = this.getDeletedDeckIds();
+    if (!list.includes(deckId)) {
+      safeSetItem(STORAGE_KEYS.DELETED_DECKS, [...list, deckId]);
+    }
+  },
+
   getFolders(): Folder[] {
     const folders = safeGetItem<Folder[]>(STORAGE_KEYS.FOLDERS, []);
-    if (folders.length === 0 && safeGetItem(STORAGE_KEYS.CARDS, []).length === 0) {
+    const cards = safeGetItem<FlashCard[]>(STORAGE_KEYS.CARDS, []);
+    const deletedDecks = this.getDeletedDeckIds();
+
+    if (folders.length === 0 && cards.length === 0 && deletedDecks.length === 0) {
       this.saveFolders(INITIAL_FOLDERS);
       return INITIAL_FOLDERS;
     }
@@ -82,22 +98,35 @@ export const storage = {
   },
 
   getDecks(): Deck[] {
+    const deletedIds = this.getDeletedDeckIds();
     const decks = safeGetItem<Deck[]>(STORAGE_KEYS.DECKS, []);
-    if (decks.length === 0 && safeGetItem(STORAGE_KEYS.CARDS, []).length === 0) {
+    const filtered = decks.filter(d => !deletedIds.includes(d.id));
+
+    // Never resurrect initial decks if user has any cards or has deleted demo deck
+    if (filtered.length === 0 && safeGetItem<FlashCard[]>(STORAGE_KEYS.CARDS, []).length === 0 && deletedIds.length === 0) {
       this.saveDecks(INITIAL_DECKS);
       return INITIAL_DECKS;
     }
-    return decks;
+    return filtered;
   },
 
   saveDecks(decks: Deck[], skipTouch = false): void {
-    safeSetItem(STORAGE_KEYS.DECKS, decks);
+    const deletedIds = this.getDeletedDeckIds();
+    const cleanDecks = decks.filter(d => !deletedIds.includes(d.id));
+    safeSetItem(STORAGE_KEYS.DECKS, cleanDecks);
     if (!skipTouch) this.touch();
   },
 
   getCards(): FlashCard[] {
+    const deletedDeckIds = this.getDeletedDeckIds();
     let cards = safeGetItem<FlashCard[]>(STORAGE_KEYS.CARDS, []);
-    if (cards.length === 0) {
+
+    // Filter out any cards belonging to tombstoned decks
+    if (deletedDeckIds.length > 0) {
+      cards = cards.filter(c => !deletedDeckIds.includes(c.deckId));
+    }
+
+    if (cards.length === 0 && deletedDeckIds.length === 0) {
       this.saveCards(INITIAL_CARDS);
       return INITIAL_CARDS;
     }

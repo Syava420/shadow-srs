@@ -158,23 +158,26 @@ export default function HomePage() {
 
   // Folder & Deck actions
   const handleCreateFolder = (name: string) => {
+    const currentFolders = storage.getFolders();
     const newFolder: Folder = { id: `folder-${Date.now()}`, name, createdAt: Date.now() };
-    const updated = [...folders, newFolder];
+    const updated = [...currentFolders, newFolder];
     setFolders(updated);
     storage.saveFolders(updated);
     triggerCloudPush();
   };
 
   const handleUpdateFolder = (id: string, name: string) => {
-    const updated = folders.map(f => f.id === id ? { ...f, name } : f);
+    const currentFolders = storage.getFolders();
+    const updated = currentFolders.map(f => f.id === id ? { ...f, name } : f);
     setFolders(updated);
     storage.saveFolders(updated);
     triggerCloudPush();
   };
 
   const handleCreateDeck = (name: string, description: string, folderId?: string) => {
+    const currentDecks = storage.getDecks();
     const newDeck: Deck = { id: `deck-${Date.now()}`, folderId, name, description, createdAt: Date.now() };
-    const updated = [...decks, newDeck];
+    const updated = [...currentDecks, newDeck];
     setDecks(updated);
     storage.saveDecks(updated);
     setSelectedDeckId(newDeck.id);
@@ -182,15 +185,18 @@ export default function HomePage() {
   };
 
   const handleUpdateDeck = (id: string, name: string, description: string, folderId?: string) => {
-    const updated = decks.map(d => d.id === id ? { ...d, name, description, folderId } : d);
+    const currentDecks = storage.getDecks();
+    const updated = currentDecks.map(d => d.id === id ? { ...d, name, description, folderId } : d);
     setDecks(updated);
     storage.saveDecks(updated);
     triggerCloudPush();
   };
 
   const handleDeleteFolder = (folderId: string) => {
-    const updatedFolders = folders.filter(f => f.id !== folderId);
-    const updatedDecks = decks.map(d => d.folderId === folderId ? { ...d, folderId: undefined } : d);
+    const currentFolders = storage.getFolders();
+    const currentDecks = storage.getDecks();
+    const updatedFolders = currentFolders.filter(f => f.id !== folderId);
+    const updatedDecks = currentDecks.map(d => d.folderId === folderId ? { ...d, folderId: undefined } : d);
     setFolders(updatedFolders);
     setDecks(updatedDecks);
     storage.saveFolders(updatedFolders);
@@ -199,8 +205,13 @@ export default function HomePage() {
   };
 
   const handleDeleteDeck = (deckId: string) => {
-    const updatedDecks = decks.filter(d => d.id !== deckId);
-    const updatedCards = cards.filter(c => c.deckId !== deckId);
+    // Record tombstone so this deck can NEVER be resurrected by old cloud caches
+    storage.markDeckDeleted(deckId);
+
+    const currentDecks = storage.getDecks();
+    const currentCards = storage.getCards();
+    const updatedDecks = currentDecks.filter(d => d.id !== deckId);
+    const updatedCards = currentCards.filter(c => c.deckId !== deckId);
     setDecks(updatedDecks);
     setCards(updatedCards);
     storage.saveDecks(updatedDecks);
@@ -213,20 +224,22 @@ export default function HomePage() {
 
   // Card actions
   const handleImportCards = (newCards: FlashCard[]) => {
-    const updated = [...cards, ...newCards];
+    const currentCards = storage.getCards();
+    const updated = [...currentCards, ...newCards];
     setCards(updated);
     storage.saveCards(updated);
     triggerCloudPush();
   };
 
   const handleSaveCard = (card: FlashCard) => {
-    const index = cards.findIndex(c => c.id === card.id);
+    const currentCards = storage.getCards();
+    const index = currentCards.findIndex(c => c.id === card.id);
     let updated: FlashCard[];
     if (index >= 0) {
-      updated = [...cards];
+      updated = [...currentCards];
       updated[index] = card;
     } else {
-      updated = [...cards, card];
+      updated = [...currentCards, card];
     }
     setCards(updated);
     storage.saveCards(updated);
@@ -234,14 +247,17 @@ export default function HomePage() {
   };
 
   const handleDeleteCard = (cardId: string) => {
-    const updated = cards.filter(c => c.id !== cardId);
+    const currentCards = storage.getCards();
+    const updated = currentCards.filter(c => c.id !== cardId);
     setCards(updated);
     storage.saveCards(updated);
     triggerCloudPush();
   };
 
   const handleUpdateCardAfterReview = (updatedCard: FlashCard) => {
-    const updated = cards.map(c => c.id === updatedCard.id ? updatedCard : c);
+    // Read from storage directly to avoid stale closures during continuous study sessions
+    const currentCards = storage.getCards();
+    const updated = currentCards.map(c => c.id === updatedCard.id ? updatedCard : c);
     setCards(updated);
     storage.saveCards(updated);
     setStats(storage.getStats());

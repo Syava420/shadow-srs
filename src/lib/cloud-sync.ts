@@ -123,6 +123,7 @@ export const cloudSync = {
       const localStats = storage.getStats();
       const localSettings = storage.getSettings();
       const localTime = storage.getLastUpdatedAt();
+      const deletedDeckIds = storage.getDeletedDeckIds();
 
       // Case 1: Cloud is empty, push local to cloud
       if (!cloudData) {
@@ -134,30 +135,60 @@ export const cloudSync = {
         return { success: true, pulled: false, pushed: false };
       }
 
+      // Filter out any zombie decks or cards that were deleted by the user locally
+      const cleanCloudDecks = (cloudData.decks || []).filter(d => !deletedDeckIds.includes(d.id));
+      const cleanCloudCards = (cloudData.cards || []).filter(c => !deletedDeckIds.includes(c.deckId));
+
+      // DATA PROTECTION SHIELD:
+      // If local has a large working deck (e.g. 500+ cards) and cloud only has sample/empty cards (< 20 cards),
+      // NEVER overwrite local with cloud! Always push local to cloud!
+      if (localCards.length > 20 && cleanCloudCards.length < 10) {
+        console.warn('Cloud data has fewer cards than local. Pushing local data to cloud.');
+        const now = storage.touch();
+        await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now);
+        return { success: true, pulled: false, pushed: true };
+      }
+
       const cloudTime = cloudData.updatedAt || 0;
 
-      // Case 2: Fresh device with no local history, or cloud is strictly newer
-      // Overwrite local with cloud state — NEVER RESURRECT DELETED DECKS/CARDS!
-      if (cloudTime > localTime || localTime === 0) {
+      // Case 2: Cloud is strictly newer than local
+      if (cloudTime > localTime) {
+        // Safe stats merge: never wipe out today's study records with an older/empty cloud day!
+        const mergedDailyHistory = { ...(cloudData.stats?.dailyHistory || {}) };
+        for (const [dateKey, localDay] of Object.entries(localStats.dailyHistory || {})) {
+          const cloudDay = mergedDailyHistory[dateKey];
+          if (!cloudDay || (localDay.cardsReviewed || 0) > (cloudDay.cardsReviewed || 0)) {
+            mergedDailyHistory[dateKey] = localDay;
+          }
+        }
+
+        const mergedStats: AppStats = {
+          streakDays: Math.max(localStats.streakDays || 1, cloudData.stats?.streakDays || 1),
+          lastStudiedDate: localStats.lastStudiedDate || cloudData.stats?.lastStudiedDate,
+          totalActiveSeconds: Math.max(localStats.totalActiveSeconds || 0, cloudData.stats?.totalActiveSeconds || 0),
+          dailyHistory: mergedDailyHistory,
+        };
+
         storage.saveFolders(cloudData.folders || [], true);
-        storage.saveDecks(cloudData.decks || [], true);
-        storage.saveCards(cloudData.cards || [], true);
-        if (cloudData.stats) storage.saveStats(cloudData.stats, true);
+        storage.saveDecks(cleanCloudDecks, true);
+        storage.saveCards(cleanCloudCards, true);
+        storage.saveStats(mergedStats, true);
         if (cloudData.settings) storage.saveSettings(cloudData.settings, true);
         storage.setLastUpdatedAt(cloudTime);
 
         return { success: true, pulled: true, pushed: false };
       }
 
-      // Case 3: Local has newer changes made while offline
-      if (localTime > cloudTime) {
+      // Case 3: Local has newer changes made while offline (or localTime === 0 but local has cards)
+      if (localTime > cloudTime || (localTime === 0 && localCards.length > 0)) {
+        const now = localTime || storage.touch();
         await this.pushToCloud(
           localFolders,
           localDecks,
           localCards,
           localStats,
           localSettings,
-          localTime
+          now
         );
         return { success: true, pulled: false, pushed: true };
       }
@@ -187,15 +218,39 @@ export const cloudSync = {
           const meta = snap.data();
           const cloudTime = meta.updatedAt || 0;
           const localTime = storage.getLastUpdatedAt();
+          const localCards = storage.getCards();
+          const deletedDeckIds = storage.getDeletedDeckIds();
 
           // Only pull if cloud timestamp is newer than our local actions
           if (cloudTime > localTime) {
             const fullCloud = await cloudSync.pullFromCloud();
             if (fullCloud) {
+              const cleanCloudCards = (fullCloud.cards || []).filter(c => !deletedDeckIds.includes(c.deckId));
+              const cleanCloudDecks = (fullCloud.decks || []).filter(d => !deletedDeckIds.includes(d.id));
+
+              // Shield: don't let empty cloud wipe large local deck
+              if (localCards.length > 20 && cleanCloudCards.length < 10) {
+                return;
+              }
+
+              const localStats = storage.getStats();
+              const mergedDailyHistory = { ...(fullCloud.stats?.dailyHistory || {}) };
+              for (const [dateKey, localDay] of Object.entries(localStats.dailyHistory || {})) {
+                const cloudDay = mergedDailyHistory[dateKey];
+                if (!cloudDay || (localDay.cardsReviewed || 0) > (cloudDay.cardsReviewed || 0)) {
+                  mergedDailyHistory[dateKey] = localDay;
+                }
+              }
+
               storage.saveFolders(fullCloud.folders || [], true);
-              storage.saveDecks(fullCloud.decks || [], true);
-              storage.saveCards(fullCloud.cards || [], true);
-              if (fullCloud.stats) storage.saveStats(fullCloud.stats, true);
+              storage.saveDecks(cleanCloudDecks, true);
+              storage.saveCards(cleanCloudCards, true);
+              if (fullCloud.stats) {
+                storage.saveStats({
+                  ...fullCloud.stats,
+                  dailyHistory: mergedDailyHistory,
+                }, true);
+              }
               if (fullCloud.settings) storage.saveSettings(fullCloud.settings, true);
               storage.setLastUpdatedAt(cloudTime);
               onDataChanged();
