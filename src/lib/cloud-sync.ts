@@ -140,10 +140,10 @@ export const cloudSync = {
       const cleanCloudCards = (cloudData.cards || []).filter(c => !deletedDeckIds.includes(c.deckId));
 
       // DATA PROTECTION SHIELD:
-      // If local has a large working deck (e.g. 500+ cards) and cloud only has sample/empty cards (< 20 cards),
+      // If local has significantly more cards than cloud (e.g. freshly imported 3,000 cards),
       // NEVER overwrite local with cloud! Always push local to cloud!
-      if (localCards.length > 20 && cleanCloudCards.length < 10) {
-        console.warn('Cloud data has fewer cards than local. Pushing local data to cloud.');
+      if (localCards.length > cleanCloudCards.length && (localCards.length - cleanCloudCards.length > 10)) {
+        console.warn('Local has more cards than cloud. Pushing local to cloud.');
         const now = storage.touch();
         await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now);
         return { success: true, pulled: false, pushed: true };
@@ -228,8 +228,8 @@ export const cloudSync = {
               const cleanCloudCards = (fullCloud.cards || []).filter(c => !deletedDeckIds.includes(c.deckId));
               const cleanCloudDecks = (fullCloud.decks || []).filter(d => !deletedDeckIds.includes(d.id));
 
-              // Shield: don't let empty cloud wipe large local deck
-              if (localCards.length > 20 && cleanCloudCards.length < 10) {
+              // Shield: don't let cloud wipe a larger local deck
+              if (localCards.length > cleanCloudCards.length && (localCards.length - cleanCloudCards.length > 10)) {
                 return;
               }
 

@@ -8,6 +8,7 @@ import { getRussianTranscription } from '@/lib/transcription';
 import { getWordGloss, GlossItem } from '@/lib/gloss';
 import { enrichGlossOnline } from '@/lib/onlineEnrichment';
 import { isCardDue, isCardNew, calculateMasteryPercent, getCardLapses } from '@/lib/fsrs';
+import { generateThematicSvg } from '@/lib/image-service';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -395,10 +396,10 @@ export const FlashCard: React.FC<FlashCardProps> = ({
 
           {/* Centered Answer Text + Art */}
           <div className="my-auto text-center flex flex-col items-center px-4 w-full">
-            {showImages && card.imageUrl && (
+            {showImages && (
               <div className="w-48 h-32 sm:w-60 sm:h-40 rounded-2xl overflow-hidden mb-6 border border-zinc-800 shadow-lg bg-zinc-900 flex-shrink-0">
                 <img
-                  src={card.imageUrl}
+                  src={card.imageUrl || generateThematicSvg(card.back)}
                   alt=""
                   className="w-full h-full object-cover"
                 />

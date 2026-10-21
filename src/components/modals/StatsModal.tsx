@@ -6,6 +6,7 @@ import { AppSettings, AppStats, FlashCard } from '@/types';
 import { calculateMasteryPercent } from '@/lib/fsrs';
 import { analyzeVocabulary } from '@/lib/vocabulary';
 import { ActivityChart } from '@/components/stats/ActivityChart';
+import { getLocalDateString } from '@/lib/date-utils';
 
 interface StatsModalProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
   settings,
   onClose,
 }) => {
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalDateString(), []);
   const vocab = useMemo(() => analyzeVocabulary(cards), [cards]);
 
   const formatTime = (totalSeconds: number) => {

@@ -3,6 +3,7 @@
 import React from 'react';
 import { FlashCard } from '@/types';
 import { isCardDue, isCardNew, calculateMasteryPercent, getCardLapses } from '@/lib/fsrs';
+import { generateThematicSvg } from '@/lib/image-service';
 import { tts } from '@/lib/tts';
 import { Volume2, Settings2, Trash2, Clock, CheckCircle2 } from 'lucide-react';
 
@@ -41,16 +42,14 @@ export const DeckCardItem: React.FC<DeckCardItemProps> = ({
       />
 
       <div className="flex items-center gap-3 flex-1 min-w-0 z-10">
-        {/* Visual Art/Photo Thumbnail (Only if image exists) */}
-        {card.imageUrl && (
-          <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-900 border border-zinc-800 shadow-inner">
-            <img
-              src={card.imageUrl}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
+        {/* Visual Art/Photo Thumbnail */}
+        <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-900 border border-zinc-800 shadow-inner">
+          <img
+            src={card.imageUrl || generateThematicSvg(card.back)}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        </div>
 
         {/* Bilingual Texts */}
         <div className="min-w-0 flex-1 pr-1">

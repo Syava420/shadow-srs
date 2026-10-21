@@ -228,7 +228,7 @@ export default function HomePage() {
     const updated = [...currentCards, ...newCards];
     setCards(updated);
     storage.saveCards(updated);
-    triggerCloudPush();
+    triggerCloudPush(true);
   };
 
   const handleSaveCard = (card: FlashCard) => {

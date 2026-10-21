@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Sparkles, Check, CheckSquare, Square, Layers, Image as ImageIcon, FileText, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Sparkles, Check, CheckSquare, Square, Layers, FileText, AlertTriangle, Upload, FileUp } from 'lucide-react';
 import { Deck, ImportPreviewItem, FlashCard } from '@/types';
 import { parsePastedText } from '@/lib/parser';
 import { createNewFSRSCard } from '@/lib/fsrs';
-import { generateThematicSvg } from '@/lib/image-service';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -36,7 +35,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 }) => {
   const [rawText, setRawText] = useState('');
   const [targetDeckId, setTargetDeckId] = useState(selectedDeckId || decks[0]?.id || '');
-  const [autoAttachImages, setAutoAttachImages] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Set default targetDeckId when opening
   useEffect(() => {
@@ -84,6 +84,30 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setRawText(text);
+    } catch (err) {
+      console.error('File read error:', err);
+    }
+  };
+
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setRawText(text);
+    } catch (err) {
+      console.error('File drop error:', err);
+    }
+  };
+
   const toggleItemSelection = (id: string) => {
     setItems(prev =>
       prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item)
@@ -106,13 +130,14 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       return;
     }
 
+    // Notice: imageUrl is omitted to keep cards lightweight (<1MB per 3,000 cards)
+    // Thematic illustrations are generated on the fly by FlashCard and DeckCardItem
     const newCards: FlashCard[] = selectedToImport.map((item, idx) => ({
       id: `card-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
       deckId: targetDeckId,
       front: item.front,
       back: item.back,
       transcription: item.transcription,
-      imageUrl: autoAttachImages ? generateThematicSvg(item.back) : undefined,
       fsrsCard: createNewFSRSCard(),
       createdAt: Date.now() + idx,
       timeSpentSeconds: 0,
@@ -138,7 +163,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-                Импорт списка из нейросети
+                Импорт фраз и слов
                 {duplicateCount > 0 && (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
@@ -147,7 +172,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 )}
               </h3>
               <p className="text-xs text-zinc-400">
-                Автоматически отсекает повторы и разделяет русский с английским
+                Загрузите .txt файл или вставьте список из нейросети
               </p>
             </div>
           </div>
@@ -162,30 +187,54 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
-          {/* Target Deck Selection */}
+          {/* Target Deck Selection & File Upload Button */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-zinc-900/80 border border-zinc-800/80">
             <div className="flex items-center gap-2 text-xs text-zinc-300 font-medium">
               <Layers className="w-4 h-4 text-zinc-400" />
               <span>Поместить в колоду:</span>
             </div>
-            <select
-              value={targetDeckId}
-              onChange={(e) => setTargetDeckId(e.target.value)}
-              className="bg-zinc-850 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 cursor-pointer"
-            >
-              {decks.map(deck => (
-                <option key={deck.id} value={deck.id}>
-                  {deck.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={targetDeckId}
+                onChange={(e) => setTargetDeckId(e.target.value)}
+                className="bg-zinc-850 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 cursor-pointer"
+              >
+                {decks.map(deck => (
+                  <option key={deck.id} value={deck.id}>
+                    {deck.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.csv,.tsv"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Загрузить текстовый файл со словами"
+              >
+                <Upload className="w-3.5 h-3.5 text-zinc-300" />
+                <span>Файл .txt / .csv</span>
+              </button>
+            </div>
           </div>
 
-          {/* Text Input Area */}
-          <div>
+          {/* Text Input Area with Drag-and-Drop */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleFileDrop}
+            className={`relative rounded-2xl transition-all ${isDragging ? 'ring-2 ring-zinc-400 bg-zinc-900/80' : ''}`}
+          >
             <div className="flex items-center justify-between mb-1.5 text-xs">
-              <label className="font-medium text-zinc-300">
-                Вставьте список фраз через тире или запятую:
+              <label className="font-medium text-zinc-300 flex items-center gap-1.5">
+                <span>Вставьте список фраз или перетащите .txt файл:</span>
               </label>
               <button
                 type="button"
@@ -196,34 +245,25 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 Пример 5 фраз
               </button>
             </div>
+
             <textarea
-              rows={6}
+              rows={5}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Вставляйте сразу пачкой:
+              placeholder="Вставляйте текст или перетащите .txt файл:
 Не делай из мухи слона - Don't make a mountain out of a molehill
-Мы с тобой на одной волне - We are on the same page"
+Мы с тобой на одной волне - We are on the same page
+Слово: Word
+apple - яблоко"
               className="w-full bg-[#09090b] border border-zinc-800 rounded-2xl p-4 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors resize-none leading-relaxed"
             />
-          </div>
 
-          {/* Options: Auto attach image */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/50 border border-zinc-800/60">
-            <button
-              type="button"
-              onClick={() => setAutoAttachImages(!autoAttachImages)}
-              className="flex items-center gap-2.5 text-xs text-zinc-300 hover:text-zinc-100 cursor-pointer"
-            >
-              {autoAttachImages ? (
-                <CheckSquare className="w-4 h-4 text-zinc-200" />
-              ) : (
-                <Square className="w-4 h-4 text-zinc-600" />
-              )}
-              <span className="flex items-center gap-1.5 font-medium">
-                <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
-                Автоматически создавать иллюстрации
-              </span>
-            </button>
+            {isDragging && (
+              <div className="absolute inset-0 bg-[#09090b]/90 border-2 border-dashed border-zinc-400 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+                <FileUp className="w-8 h-8 text-zinc-300" />
+                <span className="text-xs font-medium text-zinc-200">Отпустите .txt или .csv файл для импорта</span>
+              </div>
+            )}
           </div>
 
           {/* Live Preview List with Duplicate Badges */}
@@ -258,7 +298,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               </div>
 
               <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
-                {items.map((item, idx) => (
+                {items.slice(0, 100).map((item, idx) => (
                   <div
                     key={item.id}
                     onClick={() => toggleItemSelection(item.id)}
@@ -303,6 +343,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   </div>
                 ))}
               </div>
+
+              {items.length > 100 && (
+                <div className="text-[11px] text-zinc-500 text-center font-mono pt-1">
+                  Показаны первые 100 из {items.length} карточек. Все выбранные ({selectedCount}) будут добавлены.
+                </div>
+              )}
             </div>
           )}
         </div>

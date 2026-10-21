@@ -1,6 +1,6 @@
 import { Folder, Deck, FlashCard, AppSettings, AppStats, BackupData } from '@/types';
 import { INITIAL_FOLDERS, INITIAL_DECKS, INITIAL_CARDS } from './sample-data';
-import { generateThematicSvg } from './image-service';
+import { getLocalDateString, getLocalYesterdayString } from './date-utils';
 
 const STORAGE_KEYS = {
   FOLDERS: 'shadow_srs_folders',
@@ -51,7 +51,21 @@ function safeSetItem<T>(key: string, value: T): void {
 }
 
 function getTodayString(): string {
-  return new Date().toISOString().split('T')[0];
+  return getLocalDateString();
+}
+
+/**
+ * Strips heavy data:image/svg URLs so large decks (3,000+ cards) stay under 1MB in localStorage.
+ * Dynamic illustrations are rendered on the fly instead.
+ */
+function sanitizeCardsForStorage(cards: FlashCard[]): FlashCard[] {
+  return cards.map(c => {
+    if (c.imageUrl && (c.imageUrl.startsWith('data:image/svg+xml') || c.imageUrl.includes('unsplash.com') || c.imageUrl.includes('picsum.photos'))) {
+      const { imageUrl, ...rest } = c;
+      return rest;
+    }
+    return c;
+  });
 }
 
 export const storage = {
@@ -131,28 +145,26 @@ export const storage = {
       return INITIAL_CARDS;
     }
 
-    // Auto-migrate any broken unsplash or picsum links to zero-dependency SVG thematic art
-    let changed = false;
-    cards = cards.map(c => {
-      if (c.imageUrl && (c.imageUrl.includes('unsplash.com') || c.imageUrl.includes('picsum.photos'))) {
-        changed = true;
-        return {
-          ...c,
-          imageUrl: generateThematicSvg(c.back),
-        };
+    // Auto-strip any legacy bloated inline SVGs from existing storage
+    let hasBloated = false;
+    for (const c of cards) {
+      if (c.imageUrl && (c.imageUrl.startsWith('data:image/svg+xml') || c.imageUrl.includes('unsplash.com'))) {
+        hasBloated = true;
+        break;
       }
-      return c;
-    });
+    }
 
-    if (changed) {
-      this.saveCards(cards);
+    if (hasBloated) {
+      cards = sanitizeCardsForStorage(cards);
+      this.saveCards(cards, true);
     }
 
     return cards;
   },
 
   saveCards(cards: FlashCard[], skipTouch = false): void {
-    safeSetItem(STORAGE_KEYS.CARDS, cards);
+    const cleanCards = sanitizeCardsForStorage(cards);
+    safeSetItem(STORAGE_KEYS.CARDS, cleanCards);
     if (!skipTouch) this.touch();
   },
 
@@ -231,10 +243,10 @@ export const storage = {
       }
     }
 
-    // Calculate streak
+    // Calculate streak using local calendar day boundaries
     let streak = stats.streakDays || 1;
     if (stats.lastStudiedDate) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const yesterday = getLocalYesterdayString();
       if (stats.lastStudiedDate === yesterday) {
         streak += 1;
       } else if (stats.lastStudiedDate !== today) {
@@ -271,7 +283,7 @@ export const storage = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shadow-srs-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `shadow-srs-backup-${getLocalDateString()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

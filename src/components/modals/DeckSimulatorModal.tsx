@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Target, Calendar, Clock, Sparkles, X, Check, Zap, TrendingUp, RefreshCw } from 'lucide-react';
+import { getLocalDateString } from '@/lib/date-utils';
 
 interface DeckSimulatorModalProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ export const DeckSimulatorModal: React.FC<DeckSimulatorModalProps> = ({
   const defaultTargetDateStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 30);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   }, []);
   const [targetDateStr, setTargetDateStr] = useState<string>(defaultTargetDateStr);
 
@@ -291,7 +292,7 @@ export const DeckSimulatorModal: React.FC<DeckSimulatorModalProps> = ({
               <input
                 type="date"
                 value={targetDateStr}
-                min={new Date().toISOString().split('T')[0]}
+                min={getLocalDateString()}
                 onChange={(e) => setTargetDateStr(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs focus:border-emerald-500 outline-none font-mono cursor-pointer"
               />
@@ -306,7 +307,7 @@ export const DeckSimulatorModal: React.FC<DeckSimulatorModalProps> = ({
                     onClick={() => {
                       const d = new Date();
                       d.setDate(d.getDate() + item.days);
-                      setTargetDateStr(d.toISOString().split('T')[0]);
+                      setTargetDateStr(getLocalDateString(d));
                     }}
                     className="flex-1 py-1 px-2 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer truncate"
                   >

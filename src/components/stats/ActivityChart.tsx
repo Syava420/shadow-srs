@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Calendar } from 'lucide-react';
 import { DailyActivity } from '@/types';
+import { getLocalDateString } from '@/lib/date-utils';
 
 type TimeRange = '7' | '14' | '30';
 
@@ -21,7 +22,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   formatTime,
 }) => {
   const [range, setRange] = useState<TimeRange>('14');
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalDateString(), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   const daysCount = parseInt(range, 10);
@@ -42,7 +43,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
     for (let i = daysCount - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getLocalDateString(d);
       const dayData = dailyHistory[dateStr] || { cardsReviewed: 0, activeSeconds: 0 };
 
       const uniqueCount = dayData.uniqueCardIds ? dayData.uniqueCardIds.length : dayData.cardsReviewed;

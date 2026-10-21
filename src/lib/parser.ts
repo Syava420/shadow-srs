@@ -50,13 +50,23 @@ function splitLineLanguages(line: string): [string, string] | null {
     return [parts[0], parts.slice(1).join(' ')];
   }
 
-  // 3. Semicolon separation
+  // 3. Colon separation: "Слово: Word"
+  if (line.includes(':')) {
+    const idx = line.indexOf(':');
+    const left = line.slice(0, idx);
+    const right = line.slice(idx + 1);
+    if ((CYRILLIC_REGEX.test(left) && LATIN_REGEX.test(right)) || (LATIN_REGEX.test(left) && CYRILLIC_REGEX.test(right))) {
+      return [left, right];
+    }
+  }
+
+  // 4. Semicolon separation
   if (line.includes(';')) {
     const parts = line.split(';');
     return [parts[0], parts.slice(1).join(';')];
   }
 
-  // 4. Smart comma separation: find the comma that sits on the boundary between languages
+  // 5. Smart comma separation: find the comma that sits on the boundary between languages
   const commaIndices: number[] = [];
   for (let i = 0; i < line.length; i++) {
     if (line[i] === ',') commaIndices.push(i);
