@@ -7,6 +7,7 @@ import { tts } from '@/lib/tts';
 import { getRussianTranscription } from '@/lib/transcription';
 import { getWordGloss, GlossItem } from '@/lib/gloss';
 import { enrichGlossOnline } from '@/lib/onlineEnrichment';
+import { isCardDue, isCardNew, calculateMasteryPercent, getCardLapses } from '@/lib/fsrs';
 
 export type CardDirection = 'ru_to_en' | 'en_to_ru';
 
@@ -217,9 +218,29 @@ export const FlashCard: React.FC<FlashCardProps> = ({
         >
           {/* Top Indicators */}
           <div className="w-full flex items-center justify-between">
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
-              {isRuToEn ? 'RU → EN' : 'EN → RU · Аудирование'}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
+                {isRuToEn ? 'RU → EN' : 'EN → RU · Аудирование'}
+              </span>
+              {isCardNew(card) ? (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800/50 text-blue-300">
+                  Новая
+                </span>
+              ) : isCardDue(card) ? (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-amber-950/70 border border-amber-800/50 text-amber-300">
+                  Повторение
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
+                  Практика
+                </span>
+              )}
+              {getCardLapses(card) >= 3 && (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-rose-950/70 border border-rose-800/50 text-rose-300">
+                  {getCardLapses(card)} ошиб.
+                </span>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               {!isRuToEn && (
@@ -323,17 +344,28 @@ export const FlashCard: React.FC<FlashCardProps> = ({
         >
           {/* Top Controls */}
           <div className="w-full flex items-center justify-between">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onFlip();
-              }}
-              className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer border border-zinc-800"
-              title="Перевернуть обратно"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFlip();
+                }}
+                className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer border border-zinc-800"
+                title="Перевернуть обратно"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+              {isCardNew(card) ? (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800/50 text-blue-300">
+                  Новая
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
+                  {calculateMasteryPercent(card)}% памяти
+                </span>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               <button

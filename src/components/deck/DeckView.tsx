@@ -63,6 +63,29 @@ export const DeckView: React.FC<DeckViewProps> = ({
   const deckCards = cards.filter(c => c.deckId === deck.id);
   const stats = calculateDeckStats(deckCards);
 
+  // Calculate upcoming study session batch composition
+  const studyBatchBreakdown = useMemo(() => {
+    const limit = (settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0)
+      ? Math.round(settings.sessionDurationMinutes * 2.5)
+      : (settings.sessionLimit || 20);
+    const dueCount = stats.dueCount;
+    const newCount = stats.newCount;
+
+    if (dueCount > 0 && newCount > 0) {
+      const baseReviews = Math.ceil(limit * 0.7);
+      const targetReviews = Math.min(dueCount, baseReviews);
+      const targetNews = Math.min(newCount, Math.max(0, limit - targetReviews));
+      return { reviews: targetReviews, news: targetNews, isPractice: false };
+    }
+    if (dueCount > 0) {
+      return { reviews: Math.min(dueCount, limit), news: 0, isPractice: false };
+    }
+    if (newCount > 0) {
+      return { reviews: 0, news: Math.min(newCount, limit), isPractice: false };
+    }
+    return { reviews: Math.min(deckCards.length, limit), news: 0, isPractice: true };
+  }, [stats.dueCount, stats.newCount, settings.sessionLimit, settings.sessionDurationMinutes, deckCards.length]);
+
   // Filter and sort cards
   const processedCards = useMemo(() => {
     let result = deckCards.filter(card => {
@@ -190,6 +213,17 @@ export const DeckView: React.FC<DeckViewProps> = ({
                 : 'Повторить колоду'}
             </span>
           </button>
+          {deckCards.length > 0 && (
+            <div className="text-[11px] font-mono text-zinc-400 mt-2 text-center">
+              {studyBatchBreakdown.isPractice
+                ? 'Все карточки на сегодня закрыты · Умная тренировка слабых мест'
+                : studyBatchBreakdown.news > 0 && studyBatchBreakdown.reviews > 0
+                ? `В этой порции: ${studyBatchBreakdown.reviews} на повторение + ${studyBatchBreakdown.news} новых`
+                : studyBatchBreakdown.reviews > 0
+                ? `В этой порции: ${studyBatchBreakdown.reviews} карточек на повторение`
+                : `В этой порции: ${studyBatchBreakdown.news} новых карточек`}
+            </div>
+          )}
         </div>
 
         {/* Row 3: Compact Settings Strip (Direction & Batch Size) */}
