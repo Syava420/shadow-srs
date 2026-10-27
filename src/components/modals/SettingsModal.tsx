@@ -124,16 +124,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Daily & Session Batch Size */}
-        <div className="space-y-2 pt-3 border-t border-zinc-800/80">
-          <div className="flex items-center justify-between">
+        {/* Daily Goals & Quotas */}
+        <div className="space-y-3 pt-3 border-t border-zinc-800/80">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Дневной план обучения (выставил и забыл)
+            </h4>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              Настройте один раз — приложение само распределит нагрузку по дням
+            </p>
+          </div>
+
+          {/* New cards per day */}
+          <div className="flex items-center justify-between py-1">
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Размер порции для тренировки
-              </h4>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
-                Сколько карточек брать в одну сессию (защита от выгорания)
-              </p>
+              <span className="text-xs text-zinc-300 block font-medium">Новых карточек в день</span>
+              <span className="text-[11px] text-zinc-500 block">Целевое количество новых слов в сутки</span>
+            </div>
+            <select
+              value={localSettings.dailyNewLimit ?? 20}
+              onChange={(e) => setLocalSettings({ ...localSettings, dailyNewLimit: Number(e.target.value) })}
+              className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-xl px-3 py-1.5 outline-none font-mono cursor-pointer"
+            >
+              <option value={5}>5 в день</option>
+              <option value={10}>10 в день</option>
+              <option value={15}>15 в день</option>
+              <option value={20}>20 в день (стандарт)</option>
+              <option value={30}>30 в день</option>
+              <option value={50}>50 в день</option>
+              <option value={100}>100 в день</option>
+            </select>
+          </div>
+
+          {/* Reviews limit per day */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-xs text-zinc-300 block font-medium">Лимит повторений в день</span>
+              <span className="text-[11px] text-zinc-500 block">Максимальный объем проверки старых слов в сутки</span>
+            </div>
+            <select
+              value={localSettings.dailyReviewLimit ?? 100}
+              onChange={(e) => setLocalSettings({ ...localSettings, dailyReviewLimit: Number(e.target.value) })}
+              className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-xl px-3 py-1.5 outline-none font-mono cursor-pointer"
+            >
+              <option value={30}>30 повторений</option>
+              <option value={50}>50 повторений</option>
+              <option value={100}>100 повторений</option>
+              <option value={200}>200 повторений</option>
+              <option value={0}>Без лимита (все накопившиеся)</option>
+            </select>
+          </div>
+
+          {/* Session Batch Size */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-xs text-zinc-300 block font-medium">
+                Размер одной порции
+              </span>
+              <span className="text-[11px] text-zinc-500 block">
+                Сколько карточек брать за один подход
+              </span>
             </div>
             <select
               value={

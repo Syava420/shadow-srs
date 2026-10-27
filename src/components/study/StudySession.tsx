@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { FlashCard as FlashCardType, AppSettings, DirectionMode } from '@/types';
 import { scheduleCardReview, isCardDue, isCardNew, calculateMasteryPercent, calculateRetrievability, State } from '@/lib/fsrs';
 import { storage } from '@/lib/storage';
+import { getLocalDateString } from '@/lib/date-utils';
 import { tts } from '@/lib/tts';
 import { FlashCard, CardDirection } from './FlashCard';
 import { StudyControls } from './StudyControls';
@@ -66,8 +67,23 @@ export const StudySession: React.FC<StudySessionProps> = ({
       return calculateRetrievability(a) - calculateRetrievability(b);
     });
 
-    // 2. New cards (never studied before)
+    // 2. New cards (never studied before) and daily limits
     const newCards = cards.filter(isCardNew);
+    const todayStr = getLocalDateString();
+    const newLearnedToday = cards.filter(c => 
+      c.fsrsCard?.reps === 1 && 
+      c.lastStudiedAt && 
+      getLocalDateString(new Date(c.lastStudiedAt)) === todayStr
+    ).length;
+
+    const dailyNewLimit = settings.dailyNewLimit ?? 20;
+    const remainingNewToday = Math.max(0, dailyNewLimit - newLearnedToday);
+    const dailyReviewLimit = settings.dailyReviewLimit ?? 100;
+
+    const availableReviews = dailyReviewLimit > 0 
+      ? dueReviews.slice(0, dailyReviewLimit) 
+      : dueReviews;
+    const availableNews = newCards.slice(0, remainingNewToday);
 
     const effectiveLimit = cardLimit !== undefined 
       ? cardLimit 
@@ -75,18 +91,16 @@ export const StudySession: React.FC<StudySessionProps> = ({
         ? Math.round(durationMins * 2.5) 
         : (settings.sessionLimit ?? 20);
 
-    // If both reviews and new cards exist: build an interleaved, balanced session
-    if (dueReviews.length > 0 && newCards.length > 0) {
-      // Allocate ~70% to reviews and ~30% to new cards within session limit,
-      // but ensure all active relearning/forgotten cards are included!
-      const limit = effectiveLimit > 0 ? effectiveLimit : dueReviews.length + newCards.length;
-      const relearningCount = dueReviews.filter(c => c.fsrsCard?.state === State.Learning || c.fsrsCard?.state === State.Relearning).length;
-      const baseReviews = Math.ceil(limit * 0.7);
-      const targetReviews = Math.max(relearningCount, Math.min(dueReviews.length, baseReviews));
-      const targetNews = Math.min(newCards.length, Math.max(0, limit - targetReviews));
+    // If both reviews and allowed new cards exist: build an interleaved, balanced session
+    if (availableReviews.length > 0 && availableNews.length > 0) {
+      const limit = effectiveLimit > 0 ? effectiveLimit : availableReviews.length + availableNews.length;
+      const relearningCount = availableReviews.filter(c => c.fsrsCard?.state === State.Learning || c.fsrsCard?.state === State.Relearning).length;
+      const baseNews = Math.min(availableNews.length, Math.max(1, Math.round(limit * 0.3)));
+      const targetReviews = Math.max(relearningCount, Math.min(availableReviews.length, limit - baseNews));
+      const targetNews = Math.min(availableNews.length, Math.max(0, limit - targetReviews));
       
-      const sliceReviews = dueReviews.slice(0, targetReviews);
-      const sliceNews = newCards.slice(0, targetNews);
+      const sliceReviews = availableReviews.slice(0, targetReviews);
+      const sliceNews = availableNews.slice(0, targetNews);
 
       // Interleave in natural pattern: [review, review, new, review, review, new...]
       const mixed: FlashCardType[] = [];
@@ -100,14 +114,14 @@ export const StudySession: React.FC<StudySessionProps> = ({
       return mixed;
     }
 
-    // If only reviews exist:
-    if (dueReviews.length > 0) {
-      return effectiveLimit > 0 ? dueReviews.slice(0, effectiveLimit) : dueReviews;
+    // If only reviews exist (or new card daily quota is already completed):
+    if (availableReviews.length > 0) {
+      return effectiveLimit > 0 ? availableReviews.slice(0, effectiveLimit) : availableReviews;
     }
 
-    // If only new cards exist:
-    if (newCards.length > 0) {
-      return effectiveLimit > 0 ? newCards.slice(0, effectiveLimit) : newCards;
+    // If only allowed new cards exist:
+    if (availableNews.length > 0) {
+      return effectiveLimit > 0 ? availableNews.slice(0, effectiveLimit) : availableNews;
     }
 
     // Fallback if fully caught up: smart practice mode

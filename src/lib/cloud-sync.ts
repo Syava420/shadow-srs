@@ -13,13 +13,30 @@ export interface CloudPayload {
   cards: FlashCard[];
   stats: AppStats;
   settings?: AppSettings;
+  lastPushedBy?: string;
 }
 
-const CHUNK_SIZE = 250; // Keep each document well under Firestore 1MB limit
+// 1,000 cards without SVG is ~300KB, well under Firestore 1MB limit.
+// 3,000 cards requires only 3 documents instead of 12!
+const CHUNK_SIZE = 1000;
+
+// Unique client identifier to prevent downloading our own uploads (echo suppression)
+const CLIENT_ID = typeof window !== 'undefined'
+  ? (window.sessionStorage?.getItem('shadow_srs_client_id') || (() => {
+      const id = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      try { window.sessionStorage?.setItem('shadow_srs_client_id', id); } catch {}
+      return id;
+    })())
+  : 'server';
 
 export const cloudSync = {
+  getClientId(): string {
+    return CLIENT_ID;
+  },
+
   /**
-   * Pushes all current local data to Firestore with a specific or current timestamp
+   * Pushes all current local data to Firestore in parallel chunks.
+   * Reports real-time percentage progress (0 - 100%).
    */
   async pushToCloud(
     folders: Folder[],
@@ -27,11 +44,15 @@ export const cloudSync = {
     cards: FlashCard[],
     stats: AppStats,
     settings: AppSettings,
-    timestamp?: number
+    timestamp?: number,
+    onProgress?: (percent: number) => void
   ): Promise<boolean> {
     try {
       const now = timestamp || Date.now();
       storage.setLastUpdatedAt(now);
+      if (onProgress) onProgress(15);
+
+      const chunkCount = Math.ceil(cards.length / CHUNK_SIZE);
 
       // 1. Save metadata, folders, decks, stats, and settings
       await setDoc(doc(db, 'shadow_srs', 'metadata'), {
@@ -42,20 +63,39 @@ export const cloudSync = {
         stats,
         settings,
         totalCards: cards.length,
-        chunkCount: Math.ceil(cards.length / CHUNK_SIZE),
+        chunkCount,
+        lastPushedBy: CLIENT_ID,
       });
 
-      // 2. Save cards in chunks
-      const chunkCount = Math.ceil(cards.length / CHUNK_SIZE);
+      if (onProgress) onProgress(35);
+
+      if (chunkCount === 0) {
+        if (onProgress) onProgress(100);
+        return true;
+      }
+
+      // 2. Save card chunks in parallel
+      let completedChunks = 0;
+      const chunkPromises = [];
+
       for (let i = 0; i < chunkCount; i++) {
         const chunk = cards.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        await setDoc(doc(db, 'shadow_srs', `cards_chunk_${i}`), {
+        const p = setDoc(doc(db, 'shadow_srs', `cards_chunk_${i}`), {
           chunkIndex: i,
           cards: chunk,
           updatedAt: now,
+        }).then(() => {
+          completedChunks++;
+          if (onProgress) {
+            const pct = 35 + Math.round((completedChunks / chunkCount) * 65);
+            onProgress(Math.min(100, pct));
+          }
         });
+        chunkPromises.push(p);
       }
 
+      await Promise.all(chunkPromises);
+      if (onProgress) onProgress(100);
       return true;
     } catch (error) {
       console.error('Firebase cloud push failed:', error);
@@ -64,17 +104,19 @@ export const cloudSync = {
   },
 
   /**
-   * Pulls all data from Firestore
+   * Pulls all data from Firestore in parallel chunks with progress reporting
    */
-  async pullFromCloud(): Promise<{
+  async pullFromCloud(onProgress?: (percent: number) => void): Promise<{
     folders?: Folder[];
     decks?: Deck[];
     cards?: FlashCard[];
     stats?: AppStats;
     settings?: AppSettings;
     updatedAt: number;
+    lastPushedBy?: string;
   } | null> {
     try {
+      if (onProgress) onProgress(15);
       const metaSnap = await getDoc(doc(db, 'shadow_srs', 'metadata'));
       if (!metaSnap.exists()) {
         return null;
@@ -82,17 +124,45 @@ export const cloudSync = {
 
       const meta = metaSnap.data();
       const chunkCount = meta.chunkCount || 0;
-      let allCards: FlashCard[] = [];
+      if (onProgress) onProgress(35);
+
+      if (chunkCount === 0) {
+        if (onProgress) onProgress(100);
+        return {
+          folders: meta.folders || [],
+          decks: meta.decks || [],
+          cards: [],
+          stats: meta.stats,
+          settings: meta.settings,
+          updatedAt: meta.updatedAt || 0,
+          lastPushedBy: meta.lastPushedBy,
+        };
+      }
+
+      // Download all chunks in parallel
+      let downloadedCount = 0;
+      const chunkPromises = [];
 
       for (let i = 0; i < chunkCount; i++) {
-        const chunkSnap = await getDoc(doc(db, 'shadow_srs', `cards_chunk_${i}`));
-        if (chunkSnap.exists()) {
-          const chunkData = chunkSnap.data();
-          if (Array.isArray(chunkData.cards)) {
-            allCards = allCards.concat(chunkData.cards);
+        const p = getDoc(doc(db, 'shadow_srs', `cards_chunk_${i}`)).then((chunkSnap) => {
+          downloadedCount++;
+          if (onProgress) {
+            const pct = 35 + Math.round((downloadedCount / chunkCount) * 65);
+            onProgress(Math.min(100, pct));
           }
-        }
+          if (chunkSnap.exists()) {
+            const chunkData = chunkSnap.data();
+            return Array.isArray(chunkData.cards) ? (chunkData.cards as FlashCard[]) : [];
+          }
+          return [] as FlashCard[];
+        });
+        chunkPromises.push(p);
       }
+
+      const chunkResults = await Promise.all(chunkPromises);
+      const allCards = chunkResults.flat();
+
+      if (onProgress) onProgress(100);
 
       return {
         folders: meta.folders || [],
@@ -101,6 +171,7 @@ export const cloudSync = {
         stats: meta.stats,
         settings: meta.settings,
         updatedAt: meta.updatedAt || 0,
+        lastPushedBy: meta.lastPushedBy,
       };
     } catch (error) {
       console.error('Firebase cloud pull failed:', error);
@@ -109,13 +180,11 @@ export const cloudSync = {
   },
 
   /**
-   * Performs timestamp-based synchronization (Last-Write-Wins without zombie resurrecting):
-   * - If cloud was modified more recently than local: replace local storage with cloud (respects deletions!).
-   * - If local has newer unpushed changes: push local to cloud.
+   * Performs timestamp-based synchronization with progress callback
    */
-  async sync(): Promise<{ success: boolean; pulled: boolean; pushed: boolean }> {
+  async sync(onProgress?: (percent: number) => void): Promise<{ success: boolean; pulled: boolean; pushed: boolean }> {
     try {
-      const cloudData = await this.pullFromCloud();
+      const cloudData = await this.pullFromCloud(onProgress);
 
       const localDecks = storage.getDecks();
       const localCards = storage.getCards();
@@ -129,23 +198,22 @@ export const cloudSync = {
       if (!cloudData) {
         if (localCards.length > 0) {
           const now = storage.touch();
-          await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now);
+          await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now, onProgress);
           return { success: true, pulled: false, pushed: true };
         }
         return { success: true, pulled: false, pushed: false };
       }
 
-      // Filter out any zombie decks or cards that were deleted by the user locally
+      // Filter out any tombstoned decks or cards
       const cleanCloudDecks = (cloudData.decks || []).filter(d => !deletedDeckIds.includes(d.id));
       const cleanCloudCards = (cloudData.cards || []).filter(c => !deletedDeckIds.includes(c.deckId));
 
       // DATA PROTECTION SHIELD:
-      // If local has significantly more cards than cloud (e.g. freshly imported 3,000 cards),
-      // NEVER overwrite local with cloud! Always push local to cloud!
+      // If local has more cards than cloud, NEVER let cloud overwrite local! Always push local to cloud!
       if (localCards.length > cleanCloudCards.length && (localCards.length - cleanCloudCards.length > 10)) {
         console.warn('Local has more cards than cloud. Pushing local to cloud.');
         const now = storage.touch();
-        await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now);
+        await this.pushToCloud(localFolders, localDecks, localCards, localStats, localSettings, now, onProgress);
         return { success: true, pulled: false, pushed: true };
       }
 
@@ -153,7 +221,6 @@ export const cloudSync = {
 
       // Case 2: Cloud is strictly newer than local
       if (cloudTime > localTime) {
-        // Safe stats merge: never wipe out today's study records with an older/empty cloud day!
         const mergedDailyHistory = { ...(cloudData.stats?.dailyHistory || {}) };
         for (const [dateKey, localDay] of Object.entries(localStats.dailyHistory || {})) {
           const cloudDay = mergedDailyHistory[dateKey];
@@ -179,7 +246,7 @@ export const cloudSync = {
         return { success: true, pulled: true, pushed: false };
       }
 
-      // Case 3: Local has newer changes made while offline (or localTime === 0 but local has cards)
+      // Case 3: Local has newer changes made offline
       if (localTime > cloudTime || (localTime === 0 && localCards.length > 0)) {
         const now = localTime || storage.touch();
         await this.pushToCloud(
@@ -188,7 +255,8 @@ export const cloudSync = {
           localCards,
           localStats,
           localSettings,
-          now
+          now,
+          onProgress
         );
         return { success: true, pulled: false, pushed: true };
       }
@@ -203,10 +271,9 @@ export const cloudSync = {
 
   /**
    * Listens for real-time changes in Firestore.
-   * When another device deletes or adds anything, this device automatically
-   * updates its local storage and triggers React re-render.
+   * Suppresses own client echo to prevent UI freeze and redundant downloads.
    */
-  subscribeToCloud(onDataChanged: () => void): () => void {
+  subscribeToCloud(onDataChanged: () => void, isActivelyStudying?: () => boolean): () => void {
     if (typeof window === 'undefined') return () => {};
 
     try {
@@ -216,12 +283,22 @@ export const cloudSync = {
         async (snap) => {
           if (!snap.exists()) return;
           const meta = snap.data();
+
+          // Suppress own echo: do not re-download if we were the ones who pushed!
+          if (meta.lastPushedBy && meta.lastPushedBy === CLIENT_ID) {
+            return;
+          }
+
+          // Do not interrupt active study sessions with full background reloads
+          if (isActivelyStudying && isActivelyStudying()) {
+            return;
+          }
+
           const cloudTime = meta.updatedAt || 0;
           const localTime = storage.getLastUpdatedAt();
           const localCards = storage.getCards();
           const deletedDeckIds = storage.getDeletedDeckIds();
 
-          // Only pull if cloud timestamp is newer than our local actions
           if (cloudTime > localTime) {
             const fullCloud = await cloudSync.pullFromCloud();
             if (fullCloud) {

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { DeckSimulatorModal } from '@/components/modals/DeckSimulatorModal';
 import { DeckCardItem } from './DeckCardItem';
+import { getLocalDateString } from '@/lib/date-utils';
 
 interface DeckViewProps {
   deck: Deck;
@@ -63,28 +64,68 @@ export const DeckView: React.FC<DeckViewProps> = ({
   const deckCards = cards.filter(c => c.deckId === deck.id);
   const stats = calculateDeckStats(deckCards);
 
+  const todayStr = useMemo(() => getLocalDateString(), []);
+  const newLearnedToday = useMemo(() => {
+    return deckCards.filter(c => 
+      c.fsrsCard?.reps === 1 && 
+      c.lastStudiedAt && 
+      getLocalDateString(new Date(c.lastStudiedAt)) === todayStr
+    ).length;
+  }, [deckCards, todayStr]);
+
+  const dailyNewLimit = settings.dailyNewLimit ?? 20;
+  const remainingNewToday = Math.max(0, dailyNewLimit - newLearnedToday);
+  const dailyReviewLimit = settings.dailyReviewLimit ?? 100;
+
   // Calculate upcoming study session batch composition
   const studyBatchBreakdown = useMemo(() => {
     const limit = (settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0)
       ? Math.round(settings.sessionDurationMinutes * 2.5)
       : (settings.sessionLimit || 20);
-    const dueCount = stats.dueCount;
-    const newCount = stats.newCount;
 
-    if (dueCount > 0 && newCount > 0) {
-      const baseReviews = Math.ceil(limit * 0.7);
-      const targetReviews = Math.min(dueCount, baseReviews);
-      const targetNews = Math.min(newCount, Math.max(0, limit - targetReviews));
-      return { reviews: targetReviews, news: targetNews, isPractice: false };
+    const availableReviews = dailyReviewLimit > 0 
+      ? Math.min(stats.dueCount, dailyReviewLimit) 
+      : stats.dueCount;
+    const availableNews = Math.min(stats.newCount, remainingNewToday);
+
+    if (availableReviews > 0 && availableNews > 0) {
+      const baseNews = Math.min(availableNews, Math.max(1, Math.round(limit * 0.3)));
+      const targetReviews = Math.min(availableReviews, limit - baseNews);
+      const targetNews = Math.min(availableNews, limit - targetReviews);
+      return { 
+        reviews: targetReviews, 
+        news: targetNews, 
+        remainingNewToday, 
+        isPractice: false,
+        quotaReached: remainingNewToday === 0 && stats.newCount > 0,
+      };
     }
-    if (dueCount > 0) {
-      return { reviews: Math.min(dueCount, limit), news: 0, isPractice: false };
+    if (availableReviews > 0) {
+      return { 
+        reviews: Math.min(availableReviews, limit), 
+        news: 0, 
+        remainingNewToday, 
+        isPractice: false,
+        quotaReached: remainingNewToday === 0 && stats.newCount > 0,
+      };
     }
-    if (newCount > 0) {
-      return { reviews: 0, news: Math.min(newCount, limit), isPractice: false };
+    if (availableNews > 0) {
+      return { 
+        reviews: 0, 
+        news: Math.min(availableNews, limit), 
+        remainingNewToday, 
+        isPractice: false,
+        quotaReached: false,
+      };
     }
-    return { reviews: Math.min(deckCards.length, limit), news: 0, isPractice: true };
-  }, [stats.dueCount, stats.newCount, settings.sessionLimit, settings.sessionDurationMinutes, deckCards.length]);
+    return { 
+      reviews: Math.min(deckCards.length, limit), 
+      news: 0, 
+      remainingNewToday, 
+      isPractice: true,
+      quotaReached: remainingNewToday === 0 && stats.newCount > 0,
+    };
+  }, [stats.dueCount, stats.newCount, settings.sessionLimit, settings.sessionDurationMinutes, dailyReviewLimit, remainingNewToday, deckCards.length]);
 
   // Filter and sort cards
   const processedCards = useMemo(() => {
@@ -217,11 +258,13 @@ export const DeckView: React.FC<DeckViewProps> = ({
             <div className="text-[11px] font-mono text-zinc-400 mt-2 text-center">
               {studyBatchBreakdown.isPractice
                 ? 'Все карточки на сегодня закрыты · Умная тренировка слабых мест'
+                : studyBatchBreakdown.quotaReached && studyBatchBreakdown.reviews > 0
+                ? `Дневной план новых (${dailyNewLimit}) закрыт · В этой порции: ${studyBatchBreakdown.reviews} на повторение`
                 : studyBatchBreakdown.news > 0 && studyBatchBreakdown.reviews > 0
-                ? `В этой порции: ${studyBatchBreakdown.reviews} на повторение + ${studyBatchBreakdown.news} новых`
+                ? `В этой порции: ${studyBatchBreakdown.reviews} на повторение + ${studyBatchBreakdown.news} новых (осталось в плане: ${studyBatchBreakdown.remainingNewToday})`
                 : studyBatchBreakdown.reviews > 0
                 ? `В этой порции: ${studyBatchBreakdown.reviews} карточек на повторение`
-                : `В этой порции: ${studyBatchBreakdown.news} новых карточек`}
+                : `В этой порции: ${studyBatchBreakdown.news} новых карточек (осталось в плане: ${studyBatchBreakdown.remainingNewToday})`}
             </div>
           )}
         </div>

@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showImages: true,
   showTranscription: true,
   dailyGoal: 20,
+  dailyNewLimit: 20,
+  dailyReviewLimit: 100,
   sessionLimit: 20,
   sessionDurationMinutes: 0,
 };
@@ -191,7 +193,8 @@ export const storage = {
   },
 
   getSettings(): AppSettings {
-    return safeGetItem<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+    const saved = safeGetItem<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+    return { ...DEFAULT_SETTINGS, ...saved };
   },
 
   saveSettings(settings: AppSettings, skipTouch = false): void {

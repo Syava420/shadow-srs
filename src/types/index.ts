@@ -38,6 +38,8 @@ export interface AppSettings {
   showImages: boolean;
   showTranscription: boolean; // Show Russian pronunciation guide under English text
   dailyGoal: number; // default 20
+  dailyNewLimit: number; // default 20 (new cards per day)
+  dailyReviewLimit: number; // default 100 (0 = unlimited reviews)
   sessionLimit: number; // default 20 (0 = unlimited)
   sessionDurationMinutes?: number; // 0 = by card count, 5 = 5 min, 10 = 10 min, etc.
 }

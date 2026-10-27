@@ -15,6 +15,7 @@ interface NavbarProps {
   totalCards: number;
   dueToday: number;
   syncStatus?: SyncStatus;
+  syncProgress?: number;
   onTriggerSync?: () => void;
 }
 
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   totalCards,
   dueToday,
   syncStatus = 'idle',
+  syncProgress,
   onTriggerSync,
 }) => {
   const handleExport = () => {
@@ -115,20 +117,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           <BarChart3 className="w-4 h-4" />
         </button>
 
-        {/* Cloud Sync Status Button */}
+        {/* Cloud Sync Status Button with Realtime Percentage */}
         <button
           onClick={onTriggerSync}
           title={
             syncStatus === 'synced'
               ? 'Облако синхронизировано (Firebase). Нажмите для обновления.'
               : syncStatus === 'syncing'
-              ? 'Синхронизация с Firebase...'
+              ? `Синхронизация с Firebase (${syncProgress || 0}%)...`
               : 'Нажмите для синхронизации с Firebase'
           }
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs transition-colors cursor-pointer"
         >
           {syncStatus === 'syncing' ? (
-            <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              <span className="text-[11px] font-mono text-amber-300 font-medium">
+                {syncProgress !== undefined ? `${syncProgress}%` : '...'}
+              </span>
+            </div>
           ) : syncStatus === 'synced' ? (
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
           ) : syncStatus === 'offline' ? (
@@ -138,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
           <span className="text-[11px] text-zinc-300 hidden md:inline">
             {syncStatus === 'syncing'
-              ? 'Синхронизация...'
+              ? 'Синхронизация'
               : syncStatus === 'synced'
               ? 'Облако активно'
               : syncStatus === 'offline'

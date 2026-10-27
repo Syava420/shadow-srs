@@ -27,9 +27,13 @@ export default function HomePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [activeStudyDeckId, setActiveStudyDeckId] = useState<string | null>(null);
+  const activeStudyDeckIdRef = useRef<string | null>(null);
+  activeStudyDeckIdRef.current = activeStudyDeckId;
+
   const [studyDirectionMode, setStudyDirectionMode] = useState<DirectionMode>('adaptive');
   const [studyCardLimit, setStudyCardLimit] = useState<number | undefined>(undefined);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [syncProgress, setSyncProgress] = useState<number | undefined>(undefined);
   const debouncedPushRef = useRef<NodeJS.Timeout | null>(null);
 
   // Modals state
@@ -71,20 +75,25 @@ export default function HomePage() {
     setMounted(true);
 
     // Initial background sync with Firebase Firestore
-    cloudSync.sync().then(res => {
+    cloudSync.sync((pct) => setSyncProgress(pct)).then(res => {
       if (res.success) {
         refreshData();
         setSyncStatus('synced');
       } else {
         setSyncStatus('offline');
       }
-    }).catch(() => setSyncStatus('offline'));
+      setSyncProgress(undefined);
+    }).catch(() => {
+      setSyncStatus('offline');
+      setSyncProgress(undefined);
+    });
 
     // Realtime subscription: updates UI automatically when any other device changes anything
+    // (Suppresses own device echo and avoids interrupting active study sessions)
     const unsubscribe = cloudSync.subscribeToCloud(() => {
       refreshData();
       setSyncStatus('synced');
-    });
+    }, () => !!activeStudyDeckIdRef.current);
 
     const handleOnline = () => {
       setSyncStatus('syncing');
@@ -128,32 +137,39 @@ export default function HomePage() {
     if (debouncedPushRef.current) clearTimeout(debouncedPushRef.current);
     const executePush = () => {
       setSyncStatus('syncing');
+      setSyncProgress(15);
       cloudSync.pushToCloud(
         storage.getFolders(),
         storage.getDecks(),
         storage.getCards(),
         storage.getStats(),
         storage.getSettings(),
-        storage.getLastUpdatedAt()
-      ).then(ok => setSyncStatus(ok ? 'synced' : 'error'));
+        storage.getLastUpdatedAt(),
+        (pct) => setSyncProgress(pct)
+      ).then(ok => {
+        setSyncStatus(ok ? 'synced' : 'error');
+        setSyncProgress(undefined);
+      });
     };
 
     if (immediate) {
       executePush();
     } else {
-      debouncedPushRef.current = setTimeout(executePush, 600);
+      debouncedPushRef.current = setTimeout(executePush, 1000);
     }
   };
 
   const handleSyncWithCloud = async () => {
     setSyncStatus('syncing');
-    const res = await cloudSync.sync();
+    setSyncProgress(15);
+    const res = await cloudSync.sync((pct) => setSyncProgress(pct));
     if (res.success) {
       refreshData();
       setSyncStatus('synced');
     } else {
       setSyncStatus('error');
     }
+    setSyncProgress(undefined);
   };
 
   // Folder & Deck actions
@@ -261,7 +277,8 @@ export default function HomePage() {
     setCards(updated);
     storage.saveCards(updated);
     setStats(storage.getStats());
-    triggerCloudPush();
+    // NOTE: In-session reviews are written to local storage instantaneously (<1ms).
+    // Cloud push happens only when the session ends or user exits to prevent lag and network spam.
   };
 
   if (!mounted) {
@@ -289,6 +306,7 @@ export default function HomePage() {
         onExit={() => {
           setActiveStudyDeckId(null);
           refreshData();
+          triggerCloudPush(true);
         }}
       />
     );
@@ -310,6 +328,7 @@ export default function HomePage() {
         totalCards={globalStats.total}
         dueToday={globalStats.dueCount}
         syncStatus={syncStatus}
+        syncProgress={syncProgress}
         onTriggerSync={handleSyncWithCloud}
       />
 
