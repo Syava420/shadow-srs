@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import WebSocket from 'ws';
 import { generateSecMsGecToken_V2, SEC_MS_GEC_VERSION_V2, TRUSTED_CLIENT_TOKEN, CHROMIUM_FULL_VERSION } from 'node-edge-tts/dist/drm';
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const WebSocket = require('ws');
 
 export async function GET(request: NextRequest) {
   const token = generateSecMsGecToken_V2();
@@ -28,9 +27,9 @@ export async function GET(request: NextRequest) {
         resolve(new NextResponse('CONNECTED_SUCCESSFULLY', { status: 200 }));
       });
 
-      ws.on('unexpected-response', (req, res) => {
+      ws.on('unexpected-response', (_req: any, res: any) => {
         let body = '';
-        res.on('data', chunk => body += chunk);
+        res.on('data', (chunk: any) => body += chunk);
         res.on('end', () => {
           resolve(new NextResponse(JSON.stringify({
             status: res.statusCode,
@@ -43,7 +42,7 @@ export async function GET(request: NextRequest) {
         });
       });
 
-      ws.on('error', (err) => {
+      ws.on('error', (err: any) => {
         resolve(new NextResponse('WS_ERROR: ' + err.message, { status: 500 }));
       });
     } catch (e: any) {
