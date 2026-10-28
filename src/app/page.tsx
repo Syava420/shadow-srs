@@ -14,6 +14,7 @@ import { CardEditModal } from '@/components/modals/CardEditModal';
 import { FolderDeckModal } from '@/components/modals/FolderDeckModal';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { StatsModal } from '@/components/modals/StatsModal';
+import { AppSkeleton } from '@/components/layout/AppSkeleton';
 import { Layers } from 'lucide-react';
 
 export default function HomePage() {
@@ -282,11 +283,7 @@ export default function HomePage() {
   };
 
   if (!mounted) {
-    return (
-      <div className="h-screen bg-[#09090b] flex items-center justify-center text-zinc-500 text-xs">
-        Загрузка ShadowSRS...
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   const selectedDeck = decks.find(d => d.id === selectedDeckId);

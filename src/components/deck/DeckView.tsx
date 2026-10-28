@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Deck, FlashCard, DirectionMode, AppSettings } from '@/types';
-import { calculateDeckStats, isCardDue, isCardNew, calculateMasteryPercent, isCardDifficult } from '@/lib/fsrs';
-import { tts } from '@/lib/tts';
+import { calculateDeckStats } from '@/lib/fsrs';
 import { 
-  Play, Plus, Search, Volume2, Trash2, Settings2,
-  Sparkles, Layers, ArrowUpDown, Clock, CheckCircle2,
-  Pencil, Target, SlidersHorizontal, AlertCircle
+  Play, Plus, Search, Layers, ArrowUpDown,
+  AlertCircle
 } from 'lucide-react';
 import { DeckSimulatorModal } from '@/components/modals/DeckSimulatorModal';
 import { DeckCardItem } from './DeckCardItem';
 import { getLocalDateString } from '@/lib/date-utils';
+import { 
+  computeStudyBatchComposition, 
+  filterAndSortCards, 
+  SortOption, 
+  FilterOption 
+} from './deck-helpers';
 
 interface DeckViewProps {
   deck: Deck;
@@ -26,9 +30,6 @@ interface DeckViewProps {
   onEditDeck?: (deck: Deck) => void;
   onDeleteDeck?: (deckId: string) => void;
 }
-
-type SortOption = 'due_first' | 'difficult_first' | 'mastery_asc' | 'mastery_desc' | 'time_spent' | 'newest' | 'alphabetical';
-type FilterOption = 'all' | 'difficult';
 
 export const DeckView: React.FC<DeckViewProps> = ({
   deck,
@@ -47,6 +48,7 @@ export const DeckView: React.FC<DeckViewProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('due_first');
   const [filterMode, setFilterMode] = useState<FilterOption>('all');
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(50);
   const [directionMode, setDirectionMode] = useState<DirectionMode>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('shadow_srs_direction_mode') as DirectionMode) || 'adaptive';
@@ -61,8 +63,8 @@ export const DeckView: React.FC<DeckViewProps> = ({
     }
   };
 
-  const deckCards = cards.filter(c => c.deckId === deck.id);
-  const stats = calculateDeckStats(deckCards);
+  const deckCards = useMemo(() => cards.filter(c => c.deckId === deck.id), [cards, deck.id]);
+  const stats = useMemo(() => calculateDeckStats(deckCards), [deckCards]);
 
   const todayStr = useMemo(() => getLocalDateString(), []);
   const newLearnedToday = useMemo(() => {
@@ -79,98 +81,22 @@ export const DeckView: React.FC<DeckViewProps> = ({
 
   // Calculate upcoming study session batch composition
   const studyBatchBreakdown = useMemo(() => {
-    const limit = (settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0)
-      ? Math.round(settings.sessionDurationMinutes * 2.5)
-      : (settings.sessionLimit || 20);
-
-    const availableReviews = dailyReviewLimit > 0 
-      ? Math.min(stats.dueCount, dailyReviewLimit) 
-      : stats.dueCount;
-    const availableNews = Math.min(stats.newCount, remainingNewToday);
-
-    if (availableReviews > 0 && availableNews > 0) {
-      const baseNews = Math.min(availableNews, Math.max(1, Math.round(limit * 0.3)));
-      const targetReviews = Math.min(availableReviews, limit - baseNews);
-      const targetNews = Math.min(availableNews, limit - targetReviews);
-      return { 
-        reviews: targetReviews, 
-        news: targetNews, 
-        remainingNewToday, 
-        isPractice: false,
-        quotaReached: remainingNewToday === 0 && stats.newCount > 0,
-      };
-    }
-    if (availableReviews > 0) {
-      return { 
-        reviews: Math.min(availableReviews, limit), 
-        news: 0, 
-        remainingNewToday, 
-        isPractice: false,
-        quotaReached: remainingNewToday === 0 && stats.newCount > 0,
-      };
-    }
-    if (availableNews > 0) {
-      return { 
-        reviews: 0, 
-        news: Math.min(availableNews, limit), 
-        remainingNewToday, 
-        isPractice: false,
-        quotaReached: false,
-      };
-    }
-    return { 
-      reviews: Math.min(deckCards.length, limit), 
-      news: 0, 
-      remainingNewToday, 
-      isPractice: true,
-      quotaReached: remainingNewToday === 0 && stats.newCount > 0,
-    };
-  }, [stats.dueCount, stats.newCount, settings.sessionLimit, settings.sessionDurationMinutes, dailyReviewLimit, remainingNewToday, deckCards.length]);
+    return computeStudyBatchComposition(deckCards, stats, settings, remainingNewToday, dailyReviewLimit);
+  }, [deckCards, stats, settings, remainingNewToday, dailyReviewLimit]);
 
   // Filter and sort cards
   const processedCards = useMemo(() => {
-    let result = deckCards.filter(card => {
-      const matchesSearch = 
-        card.front.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        card.back.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesSearch) return false;
-      if (filterMode === 'difficult') {
-        return isCardDifficult(card);
-      }
-      return true;
-    });
+    return filterAndSortCards(deckCards, searchQuery, filterMode, sortBy);
+  }, [deckCards, searchQuery, filterMode, sortBy]);
 
-    result = [...result].sort((a, b) => {
-      switch (sortBy) {
-        case 'due_first': {
-          const scoreA = isCardDue(a) ? 2 : isCardNew(a) ? 1 : 0;
-          const scoreB = isCardDue(b) ? 2 : isCardNew(b) ? 1 : 0;
-          return scoreB - scoreA;
-        }
-        case 'difficult_first':
-          return (b.fsrsCard?.lapses || 0) - (a.fsrsCard?.lapses || 0);
-        case 'mastery_asc':
-          return calculateMasteryPercent(a) - calculateMasteryPercent(b);
-        case 'mastery_desc':
-          return calculateMasteryPercent(b) - calculateMasteryPercent(a);
-        case 'time_spent':
-          return (b.timeSpentSeconds || 0) - (a.timeSpentSeconds || 0);
-        case 'alphabetical':
-          return a.back.localeCompare(b.back);
-        case 'newest':
-        default:
-          return b.createdAt - a.createdAt;
-      }
-    });
+  // Reset pagination when deck or filter criteria change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [deck.id, searchQuery, filterMode, sortBy]);
 
-    return result;
-  }, [deckCards, searchQuery, sortBy, filterMode]);
-
-  const formatSpentTime = (secs?: number) => {
-    if (!secs || secs <= 0) return '0 сек';
-    if (secs < 60) return `${Math.round(secs)} сек`;
-    return `${(secs / 60).toFixed(1)} мин`;
-  };
+  const displayedCards = useMemo(() => {
+    return processedCards.slice(0, visibleCount);
+  }, [processedCards, visibleCount]);
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] overflow-y-auto bg-[#09090b] p-4 md:p-6 select-none">
@@ -178,74 +104,61 @@ export const DeckView: React.FC<DeckViewProps> = ({
       <div className="p-5 md:p-6 rounded-2xl bg-[#121215] border border-zinc-800/80 mb-5 shadow-sm">
         {/* Row 1: Deck Title + Quick Actions */}
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Колода</span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl md:text-2xl font-bold text-zinc-100 truncate">{deck.name}</h2>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-zinc-100">{deck.name}</h2>
               {onEditDeck && (
                 <button
                   onClick={() => onEditDeck(deck)}
-                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
-                  title="Редактировать колоду"
+                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/80 transition-colors cursor-pointer"
+                  title="Переименовать колоду"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <span className="text-xs font-mono text-zinc-400">✎</span>
                 </button>
               )}
               {onDeleteDeck && (
                 <button
                   onClick={() => {
-                    if (confirm(`Удалить колоду "${deck.name}" и все её карточки?`)) {
+                    if (confirm(`Удалить колоду «${deck.name}» со всеми карточками?`)) {
                       onDeleteDeck(deck.id);
                     }
                   }}
-                  className="p-1 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="p-1 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800/80 transition-colors cursor-pointer"
                   title="Удалить колоду"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="text-xs font-mono text-zinc-400">⌫</span>
                 </button>
               )}
             </div>
-            {deck.description && (
-              <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{deck.description}</p>
-            )}
+            <p className="text-xs text-zinc-400 mt-1">
+              {deck.description || `${deckCards.length} карточек в колоде`}
+            </p>
           </div>
 
-          {/* Quick Actions (Add word / Import) */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={() => onAddCard(deck.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-750 transition-colors cursor-pointer"
-              title="Добавить карточку вручную"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Слово</span>
-            </button>
-            <button
-              onClick={onOpenImport}
-              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
-              title="Импорт списка из нейросети"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={() => onAddCard(deck.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-800 transition-colors cursor-pointer shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Слово</span>
+          </button>
         </div>
 
-        {/* Row 2: Hero Study Button */}
+        {/* Row 2: Hero Study Action Button */}
         <div className="mt-4">
           <button
-            onClick={() => onStartStudy(deck.id, directionMode, settings.sessionLimit)}
-            disabled={deckCards.length === 0}
-            className={`w-full py-3 px-5 rounded-xl font-semibold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-md active:scale-[0.99] ${
-              deckCards.length === 0
-                ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-800'
-                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-950'
-            }`}
+            onClick={() => {
+              if (stats.dueCount === 0 && stats.newCount === 0) {
+                onStartStudy(deck.id, directionMode, 20);
+              } else {
+                onStartStudy(deck.id, directionMode, settings.sessionLimit || 20);
+              }
+            }}
+            className="w-full py-3 px-4 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold text-sm transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
           >
             <Play className="w-4 h-4 fill-current" />
             <span>
-              {stats.totalNeedReview > 0 
+              {stats.totalNeedReview > 0
                 ? settings.sessionDurationMinutes && settings.sessionDurationMinutes > 0
                   ? `Учить (${settings.sessionDurationMinutes} мин)`
                   : settings.sessionLimit && settings.sessionLimit > 0 && stats.totalNeedReview > settings.sessionLimit
@@ -450,7 +363,7 @@ export const DeckView: React.FC<DeckViewProps> = ({
           </div>
         ) : (
           <div className="space-y-2">
-            {processedCards.map((card) => (
+            {displayedCards.map((card) => (
               <DeckCardItem
                 key={card.id}
                 card={card}
@@ -458,6 +371,25 @@ export const DeckView: React.FC<DeckViewProps> = ({
                 onDelete={onDeleteCard}
               />
             ))}
+
+            {visibleCount < processedCards.length && (
+              <div className="pt-4 pb-8 flex flex-col items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(prev => prev + 50)}
+                  className="px-5 py-2.5 rounded-xl bg-[#121215] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer shadow-sm active:scale-[0.98]"
+                >
+                  Показать еще 50 карточек (показано {displayedCards.length} из {processedCards.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(processedCards.length)}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-300 underline transition-colors cursor-pointer"
+                >
+                  Показать все ({processedCards.length})
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
