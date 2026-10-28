@@ -25,10 +25,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   const handleTestSpeech = () => {
-    tts.speak("Consistency is key to mastering any language.", {
-      accent: localSettings.voiceAccent,
-      rate: localSettings.speechRate,
-    });
+    tts.speak(
+      localSettings.voiceAccent === 'en-GB'
+        ? "Brilliant! The meeting has been confirmed for tomorrow morning."
+        : "Awesome! I gotta run right now, see you later!",
+      {
+        accent: localSettings.voiceAccent,
+        rate: localSettings.speechRate,
+      }
+    );
   };
 
   const handleSave = () => {
@@ -56,14 +61,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Audio / Voice Section */}
         <div className="space-y-4">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            Озвучка & Произношение
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Озвучка & Произношение
+            </h4>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
+              Azure Neural
+            </span>
+          </div>
 
           {/* Accent */}
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-              Акцент диктора
+              Нейросетевой диктор
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -75,7 +85,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Американский (US Natural)
+                <span className="block font-semibold text-zinc-200">US · Jenny Neural</span>
+                <span className="block text-[10px] text-zinc-400 mt-0.5">Американский естественный</span>
               </button>
               <button
                 type="button"
@@ -86,7 +97,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Британский (UK Oxford)
+                <span className="block font-semibold text-zinc-200">UK · Ryan Neural</span>
+                <span className="block text-[10px] text-zinc-400 mt-0.5">Британский естественный</span>
               </button>
             </div>
           </div>
