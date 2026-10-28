@@ -51,8 +51,11 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Edge TTS synthesis error:', error);
-    return new NextResponse('TTS synthesis failed', { status: 500 });
+    return new NextResponse(`TTS synthesis failed: ${error?.message || error}\n${error?.stack || ''}`, { 
+      status: 500,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   }
 }
