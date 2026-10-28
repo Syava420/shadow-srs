@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   voiceAccent: 'en-US',
+  voiceGender: 'female',
   speechRate: 1.0,
   autoPlayAudio: true,
   showImages: true,

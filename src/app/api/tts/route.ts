@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EdgeTTS } from 'node-edge-tts';
 
+const VOICE_MAP: Record<string, Record<string, string>> = {
+  'en-US': {
+    female: 'en-US-JennyNeural',
+    male: 'en-US-GuyNeural',
+  },
+  'en-GB': {
+    female: 'en-GB-SoniaNeural',
+    male: 'en-GB-RyanNeural',
+  },
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const text = searchParams.get('text');
-  const accent = searchParams.get('accent') || 'en-US';
-  const voice = searchParams.get('voice') || (accent === 'en-GB' ? 'en-GB-RyanNeural' : 'en-US-JennyNeural');
+  const accent = searchParams.get('accent') === 'en-GB' ? 'en-GB' : 'en-US';
+  const gender = searchParams.get('gender') === 'male' ? 'male' : 'female';
+  const voice = searchParams.get('voice') || VOICE_MAP[accent][gender];
   const rateMultiplier = parseFloat(searchParams.get('rate') || '1.0');
 
   if (!text || !text.trim()) {

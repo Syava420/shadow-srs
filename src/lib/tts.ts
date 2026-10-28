@@ -4,8 +4,11 @@
  * Automatically falls back to Web Speech API if offline.
  */
 
+import { storage } from '@/lib/storage';
+
 export interface TTSOptions {
   accent?: 'en-US' | 'en-GB';
+  gender?: 'male' | 'female';
   rate?: number; // 0.7 - 1.3
 }
 
@@ -47,11 +50,13 @@ class TTSService {
     this.stop();
 
     const cleanText = text.trim();
-    const accent = options.accent || 'en-US';
-    const rate = options.rate ?? 1.0;
+    const settings = typeof window !== 'undefined' ? storage.getSettings() : null;
+    const accent = options.accent || settings?.voiceAccent || 'en-US';
+    const gender = options.gender || settings?.voiceGender || 'female';
+    const rate = options.rate ?? settings?.speechRate ?? 1.0;
 
     // Use our high-quality Microsoft Azure Neural endpoint
-    const url = `/api/tts?text=${encodeURIComponent(cleanText)}&accent=${accent}&rate=${rate}`;
+    const url = `/api/tts?text=${encodeURIComponent(cleanText)}&accent=${accent}&gender=${gender}&rate=${rate}`;
     const audio = new Audio(url);
     this.currentAudio = audio;
 
@@ -85,9 +90,11 @@ class TTSService {
    */
   public preload(text: string, options: TTSOptions = {}): void {
     if (typeof window === 'undefined' || !text || !text.trim()) return;
-    const accent = options.accent || 'en-US';
-    const rate = options.rate ?? 1.0;
-    const url = `/api/tts?text=${encodeURIComponent(text.trim())}&accent=${accent}&rate=${rate}`;
+    const settings = typeof window !== 'undefined' ? storage.getSettings() : null;
+    const accent = options.accent || settings?.voiceAccent || 'en-US';
+    const gender = options.gender || settings?.voiceGender || 'female';
+    const rate = options.rate ?? settings?.speechRate ?? 1.0;
+    const url = `/api/tts?text=${encodeURIComponent(text.trim())}&accent=${accent}&gender=${gender}&rate=${rate}`;
     const audio = new Audio();
     audio.preload = 'auto';
     audio.src = url;

@@ -33,6 +33,7 @@ export interface FlashCard {
 
 export interface AppSettings {
   voiceAccent: 'en-US' | 'en-GB';
+  voiceGender?: 'male' | 'female';
   speechRate: number; // 0.7 to 1.3, default 1.0
   autoPlayAudio: boolean; // Auto play when flipped to English
   showImages: boolean;

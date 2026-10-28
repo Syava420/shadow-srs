@@ -203,6 +203,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
       const timer = setTimeout(() => {
         tts.speak(currentCard.back, {
           accent: settings.voiceAccent,
+          gender: settings.voiceGender,
           rate: settings.speechRate,
         });
       }, 100);
@@ -211,12 +212,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
       const timer = setTimeout(() => {
         tts.speak(currentCard.back, {
           accent: settings.voiceAccent,
+          gender: settings.voiceGender,
           rate: settings.speechRate,
         });
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [currentCard, isFlipped, currentDirection, settings.autoPlayAudio, settings.voiceAccent, settings.speechRate]);
+  }, [currentCard, isFlipped, currentDirection, settings.autoPlayAudio, settings.voiceAccent, settings.voiceGender, settings.speechRate]);
 
   const handleFlip = useCallback(() => {
     setIsFlipped(prev => !prev);
@@ -233,10 +235,11 @@ export const StudySession: React.FC<StudySessionProps> = ({
       const rate = isSlow ? Math.max(0.6, settings.speechRate * 0.65) : settings.speechRate;
       tts.speak(currentCard.back, {
         accent: settings.voiceAccent,
+        gender: settings.voiceGender,
         rate,
       });
     }
-  }, [currentCard, settings.voiceAccent, settings.speechRate]);
+  }, [currentCard, settings.voiceAccent, settings.voiceGender, settings.speechRate]);
 
   const handleRate = useCallback((isRemembered: boolean) => {
     if (!currentCard) return;

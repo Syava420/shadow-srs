@@ -31,6 +31,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : "Awesome! I gotta run right now, see you later!",
       {
         accent: localSettings.voiceAccent,
+        gender: localSettings.voiceGender || 'female',
         rate: localSettings.speechRate,
       }
     );
@@ -70,36 +71,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </span>
           </div>
 
-          {/* Accent */}
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-              Нейросетевой диктор
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setLocalSettings({ ...localSettings, voiceAccent: 'en-US' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
-                  localSettings.voiceAccent === 'en-US'
-                    ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <span className="block font-semibold text-zinc-200">US · Jenny Neural</span>
-                <span className="block text-[10px] text-zinc-400 mt-0.5">Американский естественный</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLocalSettings({ ...localSettings, voiceAccent: 'en-GB' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
-                  localSettings.voiceAccent === 'en-GB'
-                    ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <span className="block font-semibold text-zinc-200">UK · Ryan Neural</span>
-                <span className="block text-[10px] text-zinc-400 mt-0.5">Британский естественный</span>
-              </button>
+          {/* Voice Accent & Voice Gender */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                Акцент диктора
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLocalSettings({ ...localSettings, voiceAccent: 'en-US' })}
+                  className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
+                    localSettings.voiceAccent === 'en-US'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block font-semibold text-zinc-200">Американский (US)</span>
+                  <span className="block text-[10px] text-zinc-400 mt-0.5">
+                    {localSettings.voiceGender === 'male' ? 'Guy Neural' : 'Jenny Neural'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocalSettings({ ...localSettings, voiceAccent: 'en-GB' })}
+                  className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
+                    localSettings.voiceAccent === 'en-GB'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block font-semibold text-zinc-200">Британский (UK)</span>
+                  <span className="block text-[10px] text-zinc-400 mt-0.5">
+                    {localSettings.voiceGender === 'male' ? 'Ryan Neural' : 'Sonia Neural'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                Тембр голоса
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLocalSettings({ ...localSettings, voiceGender: 'female' })}
+                  className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
+                    (localSettings.voiceGender ?? 'female') === 'female'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block font-semibold text-zinc-200">Женский голос</span>
+                  <span className="block text-[10px] text-zinc-400 mt-0.5">
+                    {localSettings.voiceAccent === 'en-GB' ? 'Sonia Neural (UK)' : 'Jenny Neural (US)'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocalSettings({ ...localSettings, voiceGender: 'male' })}
+                  className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer text-left ${
+                    localSettings.voiceGender === 'male'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-100'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block font-semibold text-zinc-200">Мужской голос</span>
+                  <span className="block text-[10px] text-zinc-400 mt-0.5">
+                    {localSettings.voiceAccent === 'en-GB' ? 'Ryan Neural (UK)' : 'Guy Neural (US)'}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
