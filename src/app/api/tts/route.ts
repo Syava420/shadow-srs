@@ -1,61 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { EdgeTTS } from 'node-edge-tts';
+import WebSocket from 'ws';
+import { generateSecMsGecToken_V2, SEC_MS_GEC_VERSION_V2, TRUSTED_CLIENT_TOKEN, CHROMIUM_FULL_VERSION } from 'node-edge-tts/dist/drm';
 
-const VOICE_MAP: Record<string, Record<string, string>> = {
-  'en-US': {
-    female: 'en-US-JennyNeural',
-    male: 'en-US-GuyNeural',
-  },
-  'en-GB': {
-    female: 'en-GB-SoniaNeural',
-    male: 'en-GB-RyanNeural',
-  },
-};
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const text = searchParams.get('text');
-  const accent = searchParams.get('accent') === 'en-GB' ? 'en-GB' : 'en-US';
-  const gender = searchParams.get('gender') === 'male' ? 'male' : 'female';
-  const voice = searchParams.get('voice') || VOICE_MAP[accent][gender];
-  const rateMultiplier = parseFloat(searchParams.get('rate') || '1.0');
+  const token = generateSecMsGecToken_V2();
+  const url = `wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${token}&Sec-MS-GEC-Version=${SEC_MS_GEC_VERSION_V2}`;
 
-  if (!text || !text.trim()) {
-    return new NextResponse('Missing text parameter', { status: 400 });
-  }
+  return new Promise<Response>((resolve) => {
+    try {
+      const ws = new WebSocket(url, {
+        host: 'speech.platform.bing.com',
+        origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache',
+          'User-Agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROMIUM_FULL_VERSION.split('.')[0]}.0.0.0 Safari/537.36 Edg/${CHROMIUM_FULL_VERSION.split('.')[0]}.0.0.0`,
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
 
-  try {
-    // Format rate into EdgeTTS percentage format (e.g. 1.0 -> "+0%", 0.85 -> "-15%")
-    const rateDiff = Math.round((rateMultiplier - 1.0) * 100);
-    const rateStr = rateDiff >= 0 ? `+${rateDiff}%` : `${rateDiff}%`;
+      ws.on('open', () => {
+        ws.close();
+        resolve(new NextResponse('CONNECTED_SUCCESSFULLY', { status: 200 }));
+      });
 
-    const tts = new EdgeTTS({
-      voice,
-      rate: rateStr,
-      timeout: 10000,
-    });
+      ws.on('unexpected-response', (req, res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          resolve(new NextResponse(JSON.stringify({
+            status: res.statusCode,
+            headers: res.headers,
+            body: body.substring(0, 1000)
+          }, null, 2), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        });
+      });
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of tts.streamAudio(text.trim())) {
-      if (Buffer.isBuffer(chunk)) {
-        chunks.push(chunk);
-      }
+      ws.on('error', (err) => {
+        resolve(new NextResponse('WS_ERROR: ' + err.message, { status: 500 }));
+      });
+    } catch (e: any) {
+      resolve(new NextResponse('CATCH_ERROR: ' + e.message, { status: 500 }));
     }
-
-    const audioBuffer = Buffer.concat(chunks);
-
-    return new Response(audioBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
-  } catch (error: any) {
-    console.error('Edge TTS synthesis error:', error);
-    return new NextResponse(`TTS synthesis failed: ${error?.message || error}\n${error?.stack || ''}`, { 
-      status: 500,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-    });
-  }
+  });
 }
