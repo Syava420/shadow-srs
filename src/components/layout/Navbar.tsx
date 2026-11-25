@@ -1,190 +1,145 @@
 'use client';
 
 import React from 'react';
-import { Layers, Sparkles, Settings, Download, Upload, PanelLeft, PanelLeftClose, BarChart3, Cloud, RefreshCw } from 'lucide-react';
-import { storage } from '@/lib/storage';
+import { Plus, Settings, Flame, ChevronDown, BarChart3, RefreshCw, Layers } from 'lucide-react';
 import { SyncStatus } from '@/lib/cloud-sync';
 
 interface NavbarProps {
+  deckName?: string;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onOpenImport: () => void;
+  onOpenAddWords: () => void;
   onOpenStats: () => void;
   onOpenSettings: () => void;
-  onDataChanged: () => void;
-  totalCards: number;
+  streakDays: number;
   dueToday: number;
+  newCount: number;
   syncStatus?: SyncStatus;
   syncProgress?: number;
   onTriggerSync?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  deckName,
   isSidebarOpen,
   onToggleSidebar,
-  onOpenImport,
+  onOpenAddWords,
   onOpenStats,
   onOpenSettings,
-  onDataChanged,
-  totalCards,
+  streakDays,
   dueToday,
+  newCount,
   syncStatus = 'idle',
   syncProgress,
   onTriggerSync,
 }) => {
-  const handleExport = () => {
-    storage.exportBackup();
-  };
-
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const success = storage.importBackup(content);
-        if (success) {
-          onDataChanged();
-          alert('Бэкап успешно восстановлен!');
-        } else {
-          alert('Ошибка при чтении файла бэкапа.');
-        }
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   return (
-    <header className="h-16 border-b border-zinc-800/80 bg-[#0c0c0e] px-4 md:px-6 flex items-center justify-between sticky top-0 z-30 select-none">
-      <div className="flex items-center gap-3">
-        {/* Toggle Sidebar Button */}
+    <header className="border-b border-white/[0.08] bg-[#09090b]/95 backdrop-blur-md px-3 sm:px-6 py-2.5 sticky top-0 z-30">
+      <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+        {/* Left: Clean Deck Switcher Dropdown Trigger (No logo, no version, no avatar) */}
         <button
+          type="button"
           onClick={onToggleSidebar}
-          title={isSidebarOpen ? "Скрыть боковую панель" : "Показать боковую панель"}
-          className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+          aria-expanded={isSidebarOpen}
+          className="flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-zinc-900 text-left min-w-0 flex-1 max-w-[260px] sm:max-w-xs transition-colors cursor-pointer group"
+          title="Выбрать или создать колоду"
         >
-          {isSidebarOpen ? (
-            <PanelLeftClose className="w-4 h-4" />
-          ) : (
-            <PanelLeft className="w-4 h-4" />
-          )}
-        </button>
-
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
-          <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-300" />
-        </div>
-        <div>
-          <h1 className="text-sm font-semibold tracking-wide text-zinc-200 flex items-center gap-1.5 sm:gap-2">
-            ShadowSRS
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 hidden sm:inline-block">
-              FSRS
-            </span>
-          </h1>
-          <p className="text-xs text-zinc-500 hidden sm:block">Система глубокого запоминания</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 md:gap-3">
-        {/* Quick status counters */}
-        <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
-          <span className="text-zinc-400">
-            На сегодня: <strong className={dueToday > 0 ? "text-amber-400" : "text-zinc-300"}>{dueToday}</strong>
+          <Layers className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
+          <span className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">
+            {deckName || 'Колоды'}
           </span>
-          <span className="text-zinc-600">|</span>
-          <span className="text-zinc-400">
-            Всего карт: <strong className="text-zinc-300">{totalCards}</strong>
-          </span>
-        </div>
-
-        {/* Primary Action: Import from AI */}
-        <button
-          onClick={onOpenImport}
-          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium text-xs transition-colors cursor-pointer shadow-sm"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Импорт <span className="hidden sm:inline">из нейросети</span></span>
-        </button>
-
-        {/* Statistics & Calendar Button */}
-        <button
-          onClick={onOpenStats}
-          title="Календарь активности и статистика"
-          className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-        >
-          <BarChart3 className="w-4 h-4" />
-        </button>
-
-        {/* Cloud Sync Status Button with Realtime Percentage */}
-        <button
-          onClick={onTriggerSync}
-          title={
-            syncStatus === 'synced'
-              ? 'Облако синхронизировано (Firebase). Нажмите для обновления.'
-              : syncStatus === 'syncing'
-              ? `Синхронизация с Firebase (${syncProgress || 0}%)...`
-              : 'Нажмите для синхронизации с Firebase'
-          }
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs transition-colors cursor-pointer"
-        >
-          {syncStatus === 'syncing' ? (
-            <div className="flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-              <span className="text-[11px] font-mono text-amber-300 font-medium">
-                {syncProgress !== undefined ? `${syncProgress}%` : '...'}
-              </span>
-            </div>
-          ) : syncStatus === 'synced' ? (
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          ) : syncStatus === 'offline' ? (
-            <span className="w-2 h-2 rounded-full bg-zinc-500" />
-          ) : (
-            <Cloud className="w-3.5 h-3.5 text-zinc-400" />
-          )}
-          <span className="text-[11px] text-zinc-300 hidden md:inline">
-            {syncStatus === 'syncing'
-              ? 'Синхронизация'
-              : syncStatus === 'synced'
-              ? 'Облако активно'
-              : syncStatus === 'offline'
-              ? 'Офлайн (локально)'
-              : 'Синхронизировать'}
-          </span>
-        </button>
-
-        {/* Backup Export */}
-        <button
-          onClick={handleExport}
-          title="Скачать бэкап всех колод (JSON)"
-          className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-        </button>
-
-        {/* Backup Import */}
-        <label
-          title="Восстановить бэкап из файла"
-          className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-        >
-          <Upload className="w-4 h-4" />
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleImportFile}
-            className="hidden"
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-transform ${
+              isSidebarOpen ? 'rotate-180' : ''
+            }`}
           />
-        </label>
-
-        {/* Settings */}
-        <button
-          onClick={onOpenSettings}
-          title="Настройки звука и карточек"
-          className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-        >
-          <Settings className="w-4 h-4" />
         </button>
+
+        {/* Right: Quiet Telemetry + Sync Dot + Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Unified Telemetry Strip */}
+          <div className="flex items-center gap-2 sm:gap-2.5 bg-zinc-950 border border-white/[0.08] px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-mono tabular-nums text-zinc-400">
+            <span className="flex items-center gap-1 text-zinc-200" title="Серия дней подряд">
+              <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{streakDays}д</span>
+            </span>
+
+            <span className="text-zinc-800">·</span>
+
+            <span className="flex items-center gap-1" title="Карточек к повторению на сегодня">
+              <span className="text-zinc-200 font-medium">{dueToday}</span>
+              <span className="text-zinc-500">повт</span>
+            </span>
+
+            <span className="text-zinc-800 hidden xs:inline sm:inline">·</span>
+
+            <span className="hidden xs:flex sm:flex items-center gap-1" title="Новых карточек в колоде">
+              <span className="text-zinc-200 font-medium">{newCount}</span>
+              <span className="text-zinc-500">нов</span>
+            </span>
+          </div>
+
+          {/* Minimal Sync Status Dot Button */}
+          <button
+            type="button"
+            onClick={onTriggerSync}
+            title={
+              syncStatus === 'synced'
+                ? 'Синхронизировано с облаком. Нажмите для проверки.'
+                : syncStatus === 'syncing'
+                ? `Синхронизация (${syncProgress || 0}%)...`
+                : syncStatus === 'offline'
+                ? 'Офлайн-режим (данные сохранены локально)'
+                : 'Синхронизировать с облаком'
+            }
+            className="p-2 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-white/[0.08] flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            {syncStatus === 'syncing' ? (
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+            ) : (
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  syncStatus === 'synced'
+                    ? 'bg-emerald-400'
+                    : syncStatus === 'error'
+                    ? 'bg-rose-400'
+                    : 'bg-zinc-500'
+                }`}
+              />
+            )}
+          </button>
+
+          {/* Quick Add Word / Batch Button (Titanium, NOT blinding white) */}
+          <button
+            type="button"
+            onClick={onOpenAddWords}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] text-zinc-100 border border-white/10 text-xs font-medium transition-all cursor-pointer"
+            title="Добавить слово или пачку слов"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Добавить</span>
+          </button>
+
+          {/* Stats Button */}
+          <button
+            type="button"
+            onClick={onOpenStats}
+            title="Статистика и график активности"
+            className="p-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <BarChart3 className="w-4 h-4" />
+          </button>
+
+          {/* Settings Button */}
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            title="Настройки лимитов, голоса и бэкапа"
+            className="p-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </header>
   );

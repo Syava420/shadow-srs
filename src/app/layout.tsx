@@ -11,8 +11,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "ShadowSRS — Система глубокого запоминания (FSRS + Audio)",
-  description: "Темное приложение интервального повторения на базе алгоритма FSRS и живой озвучки",
+  title: "ShadowSRS",
+  description: "Система интервального повторения на базе FSRS и озвучки",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -36,7 +36,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className="min-h-full flex flex-col bg-[#09090b] text-[#e4e4e7] antialiased select-none">
+      <body className="min-h-full flex flex-col bg-[#09090b] text-[#e4e4e7] antialiased">
         <PwaRegister />
         {children}
       </body>

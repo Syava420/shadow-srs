@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FlashCard as FlashCardType, AppSettings, DirectionMode } from '@/types';
-import { scheduleCardReview, isCardDue, isCardNew, calculateMasteryPercent, calculateRetrievability, State } from '@/lib/fsrs';
+import { scheduleCardReview } from '@/lib/fsrs';
 import { storage } from '@/lib/storage';
-import { getLocalDateString } from '@/lib/date-utils';
 import { tts } from '@/lib/tts';
-import { FlashCard, CardDirection } from './FlashCard';
+import { FlashCard } from './FlashCard';
 import { StudyControls } from './StudyControls';
 import { StudySummary } from './StudySummary';
+import { buildStudyQueue, computeCardDirection, StudyQueueItem } from './study-queue';
 import { CardEditModal } from '@/components/modals/CardEditModal';
 import { X, Pencil, Clock } from 'lucide-react';
 
@@ -17,6 +17,7 @@ export type { DirectionMode };
 interface StudySessionProps {
   cards: FlashCardType[];
   settings: AppSettings;
+  effectiveDailyNew: number;
   directionMode?: DirectionMode;
   cardLimit?: number;
   sessionDurationMinutes?: number;
@@ -25,24 +26,10 @@ interface StudySessionProps {
   onExit: () => void;
 }
 
-function computeCardDirection(card: FlashCardType, mode: DirectionMode = 'adaptive'): CardDirection {
-  if (mode === 'ru_en') return 'ru_to_en';
-  if (mode === 'en_ru') return 'en_to_ru';
-  if (mode === 'random') return Math.random() < 0.5 ? 'ru_to_en' : 'en_to_ru';
-
-  // Adaptive FSRS mode:
-  const mastery = calculateMasteryPercent(card);
-  // Fresh or recently forgotten: en_to_ru (Receptive/Listening)
-  if (mastery < 35) return 'en_to_ru';
-  // Intermediate learning: ru_to_en (Productive recall/Speaking)
-  if (mastery < 75) return 'ru_to_en';
-  // Strongly mastered: 50/50 mix
-  return Math.random() < 0.5 ? 'ru_to_en' : 'en_to_ru';
-}
-
 export const StudySession: React.FC<StudySessionProps> = ({
   cards,
   settings,
+  effectiveDailyNew,
   directionMode = 'adaptive',
   cardLimit,
   sessionDurationMinutes,
@@ -50,124 +37,31 @@ export const StudySession: React.FC<StudySessionProps> = ({
   onDeleteCard,
   onExit,
 }) => {
-  const durationMins = sessionDurationMinutes !== undefined 
-    ? sessionDurationMinutes 
-    : (settings.sessionDurationMinutes || 0);
+  const durationMins =
+    sessionDurationMinutes !== undefined
+      ? sessionDurationMinutes
+      : settings.sessionDurationMinutes || 0;
 
-  const initialQueue = useMemo(() => {
-    // 1. Due review cards (already studied, urgent: memories fading right now)
-    const dueReviews = cards.filter(isCardDue);
-    // Sort due cards:
-    // Priority 1: Forgotten / Relearning cards first (highest urgency: user just failed them)
-    // Priority 2: Lowest retrievability first
-    dueReviews.sort((a, b) => {
-      const aIsRelearning = (a.fsrsCard?.state === State.Learning || a.fsrsCard?.state === State.Relearning) ? 0 : 1;
-      const bIsRelearning = (b.fsrsCard?.state === State.Learning || b.fsrsCard?.state === State.Relearning) ? 0 : 1;
-      if (aIsRelearning !== bIsRelearning) return aIsRelearning - bIsRelearning;
-      return calculateRetrievability(a) - calculateRetrievability(b);
-    });
-
-    // 2. New cards (never studied before) and daily limits
-    const newCards = cards.filter(isCardNew);
-    const todayStr = getLocalDateString();
-    const newLearnedToday = cards.filter(c => 
-      c.fsrsCard?.reps === 1 && 
-      c.lastStudiedAt && 
-      getLocalDateString(new Date(c.lastStudiedAt)) === todayStr
-    ).length;
-
-    const dailyNewLimit = settings.dailyNewLimit ?? 20;
-    const remainingNewToday = Math.max(0, dailyNewLimit - newLearnedToday);
-    const dailyReviewLimit = settings.dailyReviewLimit ?? 100;
-
-    const availableReviews = dailyReviewLimit > 0 
-      ? dueReviews.slice(0, dailyReviewLimit) 
-      : dueReviews;
-    const availableNews = newCards.slice(0, remainingNewToday);
-
-    const effectiveLimit = cardLimit !== undefined 
-      ? cardLimit 
-      : durationMins > 0 
-        ? Math.round(durationMins * 2.5) 
-        : (settings.sessionLimit ?? 20);
-
-    // If both reviews and allowed new cards exist: build an interleaved, balanced session
-    if (availableReviews.length > 0 && availableNews.length > 0) {
-      const limit = effectiveLimit > 0 ? effectiveLimit : availableReviews.length + availableNews.length;
-      const relearningCount = availableReviews.filter(c => c.fsrsCard?.state === State.Learning || c.fsrsCard?.state === State.Relearning).length;
-      const baseNews = Math.min(availableNews.length, Math.max(1, Math.round(limit * 0.3)));
-      const targetReviews = Math.max(relearningCount, Math.min(availableReviews.length, limit - baseNews));
-      const targetNews = Math.min(availableNews.length, Math.max(0, limit - targetReviews));
-      
-      const sliceReviews = availableReviews.slice(0, targetReviews);
-      const sliceNews = availableNews.slice(0, targetNews);
-
-      // Interleave in natural pattern: [review, review, new, review, review, new...]
-      const mixed: FlashCardType[] = [];
-      let rIdx = 0;
-      let nIdx = 0;
-      while (rIdx < sliceReviews.length || nIdx < sliceNews.length) {
-        if (rIdx < sliceReviews.length) mixed.push(sliceReviews[rIdx++]);
-        if (rIdx < sliceReviews.length) mixed.push(sliceReviews[rIdx++]);
-        if (nIdx < sliceNews.length) mixed.push(sliceNews[nIdx++]);
-      }
-      return mixed;
-    }
-
-    // If only reviews exist (or new card daily quota is already completed):
-    if (availableReviews.length > 0) {
-      return effectiveLimit > 0 ? availableReviews.slice(0, effectiveLimit) : availableReviews;
-    }
-
-    // If only allowed new cards exist:
-    if (availableNews.length > 0) {
-      return effectiveLimit > 0 ? availableNews.slice(0, effectiveLimit) : availableNews;
-    }
-
-    // Fallback if fully caught up: smart practice mode
-    // Prioritize cards closest to fading from memory (lowest retrievability) & difficult cards
-    const practiceCards = [...cards].sort((a, b) => {
-      const retA = calculateRetrievability(a);
-      const retB = calculateRetrievability(b);
-      // If retrievability differs by more than 8%, prioritize the more faded card
-      if (Math.abs(retA - retB) > 8) {
-        return retA - retB;
-      }
-      // Secondary: prioritize cards with more lapses (difficult cards)
-      const lapsesA = a.fsrsCard?.lapses || 0;
-      const lapsesB = b.fsrsCard?.lapses || 0;
-      if (lapsesB !== lapsesA) {
-        return lapsesB - lapsesA;
-      }
-      // Shuffle ties so practice is dynamic and varied
-      return Math.random() - 0.5;
-    });
-
-    return effectiveLimit > 0 ? practiceCards.slice(0, effectiveLimit) : practiceCards;
-  }, [cards, cardLimit, durationMins, settings.sessionLimit]);
-
-  const [queue, setQueue] = useState<FlashCardType[]>(initialQueue);
+  const [queue, setQueue] = useState<StudyQueueItem[]>(() =>
+    buildStudyQueue(cards, settings, effectiveDailyNew, directionMode, cardLimit, durationMins)
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isEditingCard, setIsEditingCard] = useState(false);
+  const [forgottenCardIds, setForgottenCardIds] = useState<Set<string>>(() => new Set());
+  const cardStartTimeRef = useRef<number>(0);
 
-  // Set of card IDs that were marked 'forgotten' during this session and haven't been resolved yet
-  const [forgottenCardIds, setForgottenCardIds] = useState<Set<string>>(new Set());
-  
-  // Track active time on card (excludes pauses > 45s)
-  const cardStartTimeRef = useRef<number>(Date.now());
-
-  // Session statistics
   const [totalReviewed, setTotalReviewed] = useState(0);
   const [rememberedCount, setRememberedCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-
-  // Live session countdown timer
   const [secondsRemaining, setSecondsRemaining] = useState<number>(() => durationMins * 60);
 
   useEffect(() => {
-    if (durationMins <= 0 || isFinished) return;
+    cardStartTimeRef.current = Date.now();
+  }, [currentIndex]);
 
+  useEffect(() => {
+    if (durationMins <= 0 || isFinished) return;
     const interval = setInterval(() => {
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
@@ -177,38 +71,30 @@ export const StudySession: React.FC<StudySessionProps> = ({
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [durationMins, isFinished]);
 
-  const currentCard = queue[currentIndex];
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isEditingCard) {
+        onExit();
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [isEditingCard, onExit]);
 
-  // Dynamic direction per card
-  const currentDirection: CardDirection = useMemo(() => {
-    if (!currentCard) return 'ru_to_en';
-    return computeCardDirection(currentCard, directionMode);
-  }, [currentCard, directionMode]);
+  const currentItem = queue[currentIndex];
+  const currentCard = currentItem?.card;
+  const currentDirection = currentItem?.direction ?? 'en_to_ru';
 
   useEffect(() => {
-    cardStartTimeRef.current = Date.now();
-  }, [currentIndex]);
+    if (!currentCard || !settings.autoPlayAudio || isEditingCard) return;
 
-  // Audio behavior based on direction:
-  // en_to_ru: audio plays on appearance (when NOT flipped)
-  // ru_to_en: audio plays on flip (when flipped to English)
-  useEffect(() => {
-    if (!currentCard || !settings.autoPlayAudio) return;
-
-    if (currentDirection === 'en_to_ru' && !isFlipped) {
-      const timer = setTimeout(() => {
-        tts.speak(currentCard.back, {
-          accent: settings.voiceAccent,
-          gender: settings.voiceGender,
-          rate: settings.speechRate,
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    } else if (currentDirection === 'ru_to_en' && isFlipped) {
+    if (
+      (currentDirection === 'en_to_ru' && !isFlipped) ||
+      (currentDirection === 'ru_to_en' && isFlipped)
+    ) {
       const timer = setTimeout(() => {
         tts.speak(currentCard.back, {
           accent: settings.voiceAccent,
@@ -218,93 +104,99 @@ export const StudySession: React.FC<StudySessionProps> = ({
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [currentCard, isFlipped, currentDirection, settings.autoPlayAudio, settings.voiceAccent, settings.voiceGender, settings.speechRate]);
+  }, [
+    currentCard,
+    isFlipped,
+    currentDirection,
+    isEditingCard,
+    settings.autoPlayAudio,
+    settings.voiceAccent,
+    settings.voiceGender,
+    settings.speechRate,
+  ]);
 
   const handleFlip = useCallback(() => {
-    setIsFlipped(prev => !prev);
+    setIsFlipped((prev) => !prev);
   }, []);
 
   const lastAudioClickRef = useRef<number>(0);
 
   const handleReplayAudio = useCallback(() => {
-    if (currentCard) {
-      const now = Date.now();
-      const isSlow = now - lastAudioClickRef.current < 1600;
-      lastAudioClickRef.current = now;
-
-      const rate = isSlow ? Math.max(0.6, settings.speechRate * 0.65) : settings.speechRate;
-      tts.speak(currentCard.back, {
-        accent: settings.voiceAccent,
-        gender: settings.voiceGender,
-        rate,
-      });
-    }
+    if (!currentCard) return;
+    const now = Date.now();
+    const isSlow = now - lastAudioClickRef.current < 1600;
+    lastAudioClickRef.current = now;
+    const rate = isSlow ? Math.max(0.6, settings.speechRate * 0.65) : settings.speechRate;
+    tts.speak(currentCard.back, {
+      accent: settings.voiceAccent,
+      gender: settings.voiceGender,
+      rate,
+    });
   }, [currentCard, settings.voiceAccent, settings.voiceGender, settings.speechRate]);
 
-  const handleRate = useCallback((isRemembered: boolean) => {
-    if (!currentCard) return;
+  const handleRate = useCallback(
+    (isRemembered: boolean) => {
+      if (!currentCard) return;
 
-    // 1. Calculate active seconds spent (capped at 45s)
-    const elapsedSecs = Math.min(45, (Date.now() - cardStartTimeRef.current) / 1000);
-    storage.recordReviewActivity(elapsedSecs, isRemembered, currentCard.id);
+      const started = cardStartTimeRef.current || Date.now();
+      const elapsedSecs = Math.min(45, (Date.now() - started) / 1000);
+      storage.recordReviewActivity(elapsedSecs, isRemembered, currentCard.id);
 
-    // 2. Schedule via FSRS
-    const updated = scheduleCardReview(currentCard, isRemembered, elapsedSecs);
-    onUpdateCard(updated);
+      const updated = scheduleCardReview(currentCard, isRemembered, elapsedSecs);
+      onUpdateCard(updated);
 
-    // 3. Update session counters
-    setTotalReviewed(prev => prev + 1);
-    if (isRemembered) {
-      setRememberedCount(prev => prev + 1);
-    }
-
-    // 4. Intra-session repetition and forgotten tracking
-    const currentCardId = currentCard.id;
-    let nextQueue = [...queue];
-
-    if (!isRemembered) {
-      // Mark as unresolved forgotten card
-      setForgottenCardIds(prev => new Set(prev).add(currentCardId));
-      
-      // Prevent duplicate instances: check if card is already waiting ahead in the remaining queue
-      const alreadyWaitingAhead = nextQueue.slice(currentIndex + 1).some(c => c.id === currentCardId);
-      if (!alreadyWaitingAhead) {
-        if (currentIndex + 4 < nextQueue.length) {
-          nextQueue.splice(currentIndex + 4, 0, currentCard);
-        } else {
-          nextQueue.push(currentCard);
-        }
+      setTotalReviewed((prev) => prev + 1);
+      if (isRemembered) {
+        setRememberedCount((prev) => prev + 1);
       }
-    } else {
-      // Successfully remembered:
-      // 1. Remove from unresolved forgotten set
-      setForgottenCardIds(prev => {
-        if (!prev.has(currentCardId)) return prev;
-        const next = new Set(prev);
-        next.delete(currentCardId);
-        return next;
-      });
 
-      // 2. Remove ANY future remaining copies of this card from the queue!
-      // Once remembered, the card is mastered for this session. User NEVER has to click 'Вспомнил' repeatedly!
-      nextQueue = nextQueue.filter((c, idx) => idx <= currentIndex || c.id !== currentCardId);
-    }
+      const currentCardId = currentCard.id;
+      let nextQueue = [...queue];
 
-    setQueue(nextQueue);
+      if (!isRemembered) {
+        setForgottenCardIds((prev) => new Set(prev).add(currentCardId));
+        const alreadyAhead = nextQueue
+          .slice(currentIndex + 1)
+          .some((item) => item.card.id === currentCardId);
+        if (!alreadyAhead) {
+          const requeueItem: StudyQueueItem = {
+            card: updated,
+            direction: computeCardDirection(updated, directionMode),
+          };
+          if (currentIndex + 4 < nextQueue.length) {
+            nextQueue.splice(currentIndex + 4, 0, requeueItem);
+          } else {
+            nextQueue.push(requeueItem);
+          }
+        }
+      } else {
+        setForgottenCardIds((prev) => {
+          if (!prev.has(currentCardId)) return prev;
+          const next = new Set(prev);
+          next.delete(currentCardId);
+          return next;
+        });
+        nextQueue = nextQueue.filter(
+          (item, idx) => idx <= currentIndex || item.card.id !== currentCardId
+        );
+      }
 
-    // 5. Advance or Finish
-    // We do NOT forcefully terminate on timer expiry: user can finish remaining queue
-    // or manually click 'Завершить' in the banner/top bar.
-    if (currentIndex + 1 < nextQueue.length) {
-      setCurrentIndex(prev => prev + 1);
-      setIsFlipped(false);
-    } else {
-      setIsFinished(true);
-    }
-  }, [currentCard, currentIndex, queue, onUpdateCard]);
+      setQueue(nextQueue);
 
-  const handleRestart = () => {
-    setQueue([...cards]);
+      if (currentIndex + 1 < nextQueue.length) {
+        setCurrentIndex((prev) => prev + 1);
+        setIsFlipped(false);
+      } else {
+        setIsFinished(true);
+      }
+    },
+    [currentCard, currentIndex, directionMode, queue, onUpdateCard]
+  );
+
+  const handleRestart = useCallback(() => {
+    setQueue(
+      buildStudyQueue(cards, settings, effectiveDailyNew, directionMode, cardLimit, durationMins)
+    );
     setCurrentIndex(0);
     setIsFlipped(false);
     setTotalReviewed(0);
@@ -312,24 +204,25 @@ export const StudySession: React.FC<StudySessionProps> = ({
     setForgottenCardIds(new Set());
     setSecondsRemaining(durationMins * 60);
     setIsFinished(false);
-  };
+  }, [cards, settings, effectiveDailyNew, directionMode, cardLimit, durationMins]);
 
   const handleReviewForgotten = useCallback(() => {
-    const forgottenList = cards.filter(c => forgottenCardIds.has(c.id));
+    const forgottenList = cards.filter((c) => forgottenCardIds.has(c.id));
     if (forgottenList.length === 0) {
       handleRestart();
       return;
     }
-    // Deduplicate in case multiple entries existed
-    const unique = Array.from(new Map(forgottenList.map(c => [c.id, c])).values());
-    setQueue(unique);
+    const unique = Array.from(new Map(forgottenList.map((c) => [c.id, c])).values());
+    setQueue(
+      unique.map((card) => ({ card, direction: computeCardDirection(card, directionMode) }))
+    );
     setCurrentIndex(0);
     setIsFlipped(false);
     setTotalReviewed(0);
     setRememberedCount(0);
     setSecondsRemaining(0);
     setIsFinished(false);
-  }, [cards, forgottenCardIds]);
+  }, [cards, directionMode, forgottenCardIds, handleRestart]);
 
   if (isFinished || !currentCard) {
     return (
@@ -350,30 +243,32 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const progressPercent = Math.min(100, Math.round(((currentIndex + 1) / queue.length) * 100));
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none overflow-hidden">
-      {/* Top Ultra-Minimal Bar */}
-      <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+    <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-between p-4 sm:p-6 overflow-hidden">
+      {/* Top Minimal Header */}
+      <div className="w-full max-w-2xl mx-auto flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={onExit}
-            className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
-            title="Завершить тренировку (Esc)"
+            className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/[0.08] transition-colors cursor-pointer"
+            title="Завершить [Esc]"
           >
             <X className="w-4 h-4" />
           </button>
 
           <button
+            type="button"
             onClick={() => setIsEditingCard(true)}
-            className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors cursor-pointer"
-            title="Редактировать карточку (удерживание)"
+            className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/[0.08] transition-colors cursor-pointer"
+            title="Редактировать"
           >
-            <Pencil className="w-4 h-4" />
+            <Pencil className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Minimal Progress Line */}
-        <div className="flex-1 max-w-md mx-4">
-          <div className="w-full h-1.5 rounded-full bg-zinc-850 overflow-hidden">
+        {/* Clean Progress Line */}
+        <div className="flex-1 max-w-sm mx-2">
+          <div className="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
             <div
               className="h-full bg-zinc-400 transition-all duration-300 rounded-full"
               style={{ width: `${progressPercent}%` }}
@@ -381,54 +276,42 @@ export const StudySession: React.FC<StudySessionProps> = ({
           </div>
         </div>
 
-        {/* Timer and Card Counter */}
-        <div className="flex items-center gap-2.5">
+        {/* Counter & Optional Timer */}
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 tabular-nums">
           {durationMins > 0 && (
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
-                secondsRemaining === 0
-                  ? 'bg-zinc-900 border-zinc-700 text-zinc-300'
-                  : secondsRemaining < 60
-                    ? 'bg-zinc-900 border-zinc-700 text-zinc-300'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
-              }`}
-              title="Оставшееся время тренировки"
-            >
-              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900 border border-white/[0.08]">
+              <Clock className="w-3 h-3 text-zinc-500" />
               <span>
                 {secondsRemaining === 0
-                  ? '0:00 (Время вышло)'
+                  ? '0:00'
                   : `${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, '0')}`}
               </span>
             </div>
           )}
-          <span className="text-xs font-mono text-zinc-500">
+          <span>
             {currentIndex + 1} / {queue.length}
           </span>
         </div>
       </div>
 
-      {/* Gentle Non-Intrusive Time-Up Banner */}
+      {/* Time-Up Gentle Banner */}
       {durationMins > 0 && secondsRemaining === 0 && (
-        <div className="w-full max-w-4xl mx-auto mt-2 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between text-xs text-zinc-300">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>
-              Время тренировки вышло. Можно доделать карточки ({queue.length - currentIndex} шт.) или завершить сейчас.
-            </span>
-          </div>
+        <div className="w-full max-w-2xl mx-auto mt-2 px-3.5 py-2 rounded-xl bg-zinc-900 border border-white/[0.08] flex items-center justify-between text-xs text-zinc-300">
+          <span>Время вышло ({queue.length - currentIndex} карт осталось)</span>
           <button
+            type="button"
             onClick={() => setIsFinished(true)}
-            className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium rounded-lg transition-colors cursor-pointer shrink-0 ml-3 text-xs"
+            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-lg border border-white/10 cursor-pointer"
           >
             Завершить
           </button>
         </div>
       )}
 
-      {/* Main Flashcard Taking Whole Center */}
-      <div className="w-full flex justify-center items-center my-auto">
+      {/* Main Centered Flashcard (key resets gloss smoothly per card) */}
+      <div className="w-full flex justify-center items-center my-auto py-3">
         <FlashCard
+          key={currentCard.id}
           card={currentCard}
           direction={currentDirection}
           isFlipped={isFlipped}
@@ -437,45 +320,50 @@ export const StudySession: React.FC<StudySessionProps> = ({
           onEdit={() => setIsEditingCard(true)}
           showImages={settings.showImages}
           voiceAccent={settings.voiceAccent}
+          voiceGender={settings.voiceGender}
           speechRate={settings.speechRate}
           showTranscription={settings.showTranscription ?? true}
         />
       </div>
 
-      {/* Ergonomic Bottom Controls */}
+      {/* Bottom 2-Button Controls */}
       <div className="w-full flex justify-center pb-2 sm:pb-4">
         <StudyControls
           card={currentCard}
           isFlipped={isFlipped}
+          disabled={isEditingCard}
           onFlip={handleFlip}
           onRate={handleRate}
           onReplayAudio={handleReplayAudio}
         />
       </div>
 
-      {/* Modal for In-Session Card Editing */}
-      {currentCard && (
-        <CardEditModal
-          isOpen={isEditingCard}
-          deckId={currentCard.deckId}
-          cardToEdit={currentCard}
-          onClose={() => setIsEditingCard(false)}
-          onSaveCard={(savedCard) => {
-            onUpdateCard(savedCard);
-            setQueue(prev => prev.map(c => c.id === savedCard.id ? savedCard : c));
-            setIsEditingCard(false);
-          }}
-          onDeleteCard={(cardId) => {
-            if (onDeleteCard) onDeleteCard(cardId);
-            const nextQueue = queue.filter(c => c.id !== cardId);
-            setQueue(nextQueue);
-            setIsEditingCard(false);
-            if (nextQueue.length === 0 || currentIndex >= nextQueue.length) {
-              setIsFinished(true);
-            }
-          }}
-        />
-      )}
+      {/* In-Session Edit Dialog */}
+      <CardEditModal
+        isOpen={isEditingCard}
+        deckId={currentCard.deckId}
+        cardToEdit={currentCard}
+        settings={settings}
+        onClose={() => setIsEditingCard(false)}
+        onSaveCard={(savedCard) => {
+          onUpdateCard(savedCard);
+          setQueue((prev) =>
+            prev.map((item) =>
+              item.card.id === savedCard.id ? { ...item, card: savedCard } : item
+            )
+          );
+          setIsEditingCard(false);
+        }}
+        onDeleteCard={(cardId) => {
+          if (onDeleteCard) onDeleteCard(cardId);
+          const nextQueue = queue.filter((item) => item.card.id !== cardId);
+          setQueue(nextQueue);
+          setIsEditingCard(false);
+          if (nextQueue.length === 0 || currentIndex >= nextQueue.length) {
+            setIsFinished(true);
+          }
+        }}
+      />
     </div>
   );
 };

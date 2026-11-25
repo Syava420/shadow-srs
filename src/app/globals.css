@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --background: #09090b;
   --surface: #121215;
   --surface-hover: #18181c;
-  --border: #27272a;
+  --border: rgba(255, 255, 255, 0.08);
   --foreground: #e4e4e7;
   --muted: #a1a1aa;
 }
@@ -13,8 +14,35 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
   overflow-x: hidden;
-  user-select: none;
+  scrollbar-color: #27272a #09090b;
+}
+
+::selection {
+  background-color: rgba(244, 244, 245, 0.22);
+  color: #ffffff;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native <dialog> Top-Layer Containment & Backdrop */
+@layer base {
+  dialog:modal {
+    overscroll-behavior: contain;
+    margin: auto;
+    max-width: calc(100vw - 1.5rem);
+    max-height: calc(100dvh - 2rem);
+  }
+
+  dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(6px);
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
 }
 
 /* 3D Perspective for Card Flip */
@@ -35,21 +63,40 @@ body {
   transform: rotateY(180deg);
 }
 
-/* Custom Eye-friendly Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #09090b;
+.animate-fadeIn {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fadeIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 9999px;
+@keyframes soundWave {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+.animate-wave-1 {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: soundWave 0.65s ease-in-out infinite;
+  }
+}
+.animate-wave-2 {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: soundWave 0.65s ease-in-out 0.18s infinite;
+  }
+}
+.animate-wave-3 {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: soundWave 0.65s ease-in-out 0.36s infinite;
+  }
 }

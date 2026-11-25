@@ -2,6 +2,19 @@ import { Folder, Deck, FlashCard, AppSettings, AppStats, BackupData } from '@/ty
 import { INITIAL_FOLDERS, INITIAL_DECKS, INITIAL_CARDS } from './sample-data';
 import { getLocalDateString, getLocalYesterdayString } from './date-utils';
 
+function isSandboxMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('sandbox') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function getKey(baseKey: string): string {
+  return isSandboxMode() ? `sandbox_${baseKey}` : baseKey;
+}
+
 const STORAGE_KEYS = {
   FOLDERS: 'shadow_srs_folders',
   DECKS: 'shadow_srs_decks',
@@ -10,7 +23,7 @@ const STORAGE_KEYS = {
   STATS: 'shadow_srs_stats',
   UPDATED_AT: 'shadow_srs_updated_at',
   DELETED_DECKS: 'shadow_srs_deleted_deck_ids',
-  BACKUP: 'shadow_srs_emergency_backup',
+  DAILY_NEW_OVERRIDE: 'shadow_srs_daily_new_override',
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -36,7 +49,7 @@ export const DEFAULT_STATS: AppStats = {
 function safeGetItem<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') return defaultValue;
   try {
-    const item = localStorage.getItem(key);
+    const item = localStorage.getItem(getKey(key));
     return item ? JSON.parse(item) : defaultValue;
   } catch (error) {
     console.error(`Error reading ${key} from localStorage:`, error);
@@ -47,7 +60,7 @@ function safeGetItem<T>(key: string, defaultValue: T): T {
 function safeSetItem<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(getKey(key), JSON.stringify(value));
   } catch (error) {
     console.error(`Error writing ${key} to localStorage:`, error);
   }
@@ -64,7 +77,8 @@ function getTodayString(): string {
 function sanitizeCardsForStorage(cards: FlashCard[]): FlashCard[] {
   return cards.map(c => {
     if (c.imageUrl && (c.imageUrl.startsWith('data:image/svg+xml') || c.imageUrl.includes('unsplash.com') || c.imageUrl.includes('picsum.photos'))) {
-      const { imageUrl, ...rest } = c;
+      const rest = { ...c };
+      delete rest.imageUrl;
       return rest;
     }
     return c;
@@ -72,6 +86,29 @@ function sanitizeCardsForStorage(cards: FlashCard[]): FlashCard[] {
 }
 
 export const storage = {
+  isSandboxMode,
+
+  getDailyNewOverride(): number | null {
+    const stored = safeGetItem<{ date: string; limit: number } | null>(STORAGE_KEYS.DAILY_NEW_OVERRIDE, null);
+    if (!stored || stored.date !== getTodayString() || typeof stored.limit !== 'number') {
+      return null;
+    }
+    return stored.limit;
+  },
+
+  setDailyNewOverride(limit: number | null): void {
+    if (typeof window === 'undefined') return;
+    if (limit === null) {
+      try {
+        localStorage.removeItem(getKey(STORAGE_KEYS.DAILY_NEW_OVERRIDE));
+      } catch {}
+      return;
+    }
+    safeSetItem(STORAGE_KEYS.DAILY_NEW_OVERRIDE, {
+      date: getTodayString(),
+      limit,
+    });
+  },
   getLastUpdatedAt(): number {
     return safeGetItem<number>(STORAGE_KEYS.UPDATED_AT, 0);
   },

@@ -7,6 +7,7 @@ import { calculateMasteryPercent } from '@/lib/fsrs';
 import { analyzeVocabulary } from '@/lib/vocabulary';
 import { ActivityChart } from '@/components/stats/ActivityChart';
 import { getLocalDateString } from '@/lib/date-utils';
+import { ModalDialog } from './ModalDialog';
 
 interface StatsModalProps {
   isOpen: boolean;
@@ -46,21 +47,23 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     return `${secs} с`;
   };
 
-  // Today's metrics
-  const todayEntry = stats.dailyHistory[todayStr] || { 
-    cardsReviewed: 0, 
-    activeSeconds: 0, 
+  const todayEntry = stats.dailyHistory[todayStr] || {
+    cardsReviewed: 0,
+    activeSeconds: 0,
     rememberedCount: 0,
     uniqueCardIds: [],
     firstTryRememberedIds: [],
   };
+
   const dailyGoal = settings?.dailyGoal || 20;
-  const todayUniqueCards = todayEntry.uniqueCardIds ? todayEntry.uniqueCardIds.length : todayEntry.cardsReviewed;
+  const todayUniqueCards = todayEntry.uniqueCardIds
+    ? todayEntry.uniqueCardIds.length
+    : todayEntry.cardsReviewed;
   const todayTotalReviews = todayEntry.cardsReviewed;
   const todayGoalPercent = Math.min(100, Math.round((todayUniqueCards / dailyGoal) * 100));
 
-  // Winrate: prefer first-try accuracy on unique cards if available, else overall ratio
-  const hasFirstTryData = todayEntry.firstTryRememberedIds !== undefined && todayEntry.uniqueCardIds !== undefined;
+  const hasFirstTryData =
+    todayEntry.firstTryRememberedIds !== undefined && todayEntry.uniqueCardIds !== undefined;
   const hasRememberedData = todayEntry.rememberedCount !== undefined;
 
   let todayWinrate: number | null = null;
@@ -79,248 +82,164 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     winrateSubtext = 'нет повторений';
   }
 
-  // Mastery levels breakdown
-  let mastered100 = 0;
-  let learning = 0;
-  let newCards = 0;
-
-  cards.forEach(c => {
-    const p = calculateMasteryPercent(c);
-    if (p >= 90) mastered100++;
-    else if (p > 0) learning++;
-    else newCards++;
-  });
-
-  if (!isOpen) return null;
+  const masteredCount = cards.filter((c) => calculateMasteryPercent(c) >= 90).length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none">
-      <div className="w-full max-w-2xl bg-[#121215] border border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
+    <ModalDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabelledBy="stats-title"
+      className="w-[calc(100%-1.5rem)] max-w-2xl bg-[#111216] border border-white/10 rounded-2xl p-5 sm:p-6 shadow-2xl text-zinc-100"
+    >
+      <div className="space-y-5 max-h-[82dvh] overflow-y-auto pr-1">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
-              <BarChart3 className="w-4 h-4 text-zinc-200" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-zinc-100">
-                Статистика и аналитика
-              </h3>
-              <p className="text-xs text-zinc-400">
-                Интервальные повторения FSRS и прогресс словарного запаса
-              </p>
-            </div>
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-zinc-400" />
+            <h2 id="stats-title" className="text-base font-semibold text-zinc-100">
+              Статистика
+            </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+            aria-label="Закрыть"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 1. TODAY'S HERO SECTION */}
-        <div className="p-4 rounded-2xl bg-[#09090b] border border-zinc-800/90 space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-                Сегодня
+        {/* Today Hero */}
+        <div className="p-4 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-zinc-200">
+              Сегодня ·{' '}
+              <span className="text-zinc-400 font-normal">
+                {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
-                {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short' })}
-              </span>
-            </div>
+            </span>
             {todayGoalPercent >= 100 ? (
-              <span className="px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] font-mono flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-md bg-zinc-800 border border-white/10 text-zinc-200 text-[11px] font-mono flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                 Цель выполнена
               </span>
             ) : (
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-zinc-500 font-mono tabular-nums">
                 Цель: {dailyGoal} карт
               </span>
             )}
           </div>
 
-          {/* Goal progress bar */}
-          <div className="space-y-1">
-            <div className="w-full h-1.5 rounded-full bg-zinc-850 overflow-hidden">
-              <div
-                className="h-full bg-zinc-200 rounded-full transition-all duration-500"
-                style={{ width: `${todayGoalPercent}%` }}
-              />
-            </div>
+          <div className="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
+            <div
+              className="h-full bg-zinc-300 rounded-full transition-all duration-500"
+              style={{ width: `${todayGoalPercent}%` }}
+            />
           </div>
 
-          {/* 3 Metrics: Cards, Focus Time, Winrate */}
-          <div className="grid grid-cols-3 gap-2.5 pt-1 border-t border-zinc-850">
-            {/* Cards today */}
-            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60 text-center">
-              <div className="text-[11px] text-zinc-500 mb-0.5">Карточек</div>
-              <div className="text-lg font-bold font-mono text-zinc-100">
+          <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-white/[0.06]">
+            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-white/[0.05] text-center">
+              <div className="text-[11px] text-zinc-500">Карточек</div>
+              <div className="text-base sm:text-lg font-bold font-mono tabular-nums text-zinc-100">
                 {todayUniqueCards}
                 <span className="text-xs text-zinc-500 font-normal"> / {dailyGoal}</span>
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate" title={todayTotalReviews > todayUniqueCards ? `Всего ответов с повторами: ${todayTotalReviews}` : undefined}>
-                {todayTotalReviews > todayUniqueCards
-                  ? `${todayTotalReviews} ответов`
-                  : `${todayGoalPercent}% нормы`}
-              </div>
             </div>
 
-            {/* Active focus time */}
-            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60 text-center">
-              <div className="text-[11px] text-zinc-500 mb-0.5">В фокусе</div>
-              <div className="text-lg font-bold font-mono text-zinc-100">
+            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-white/[0.05] text-center">
+              <div className="text-[11px] text-zinc-500">В фокусе</div>
+              <div className="text-base sm:text-lg font-bold font-mono tabular-nums text-zinc-100">
                 {formatTime(todayEntry.activeSeconds)}
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
-                чистое время
-              </div>
             </div>
 
-            {/* Winrate */}
-            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60 text-center">
-              <div className="text-[11px] text-zinc-500 mb-0.5">Точность</div>
-              <div className="text-lg font-bold font-mono text-zinc-100">
+            <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-white/[0.05] text-center">
+              <div className="text-[11px] text-zinc-500">Точность</div>
+              <div className="text-base sm:text-lg font-bold font-mono tabular-nums text-zinc-100">
                 {todayWinrate !== null ? `${todayWinrate}%` : '—'}
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate">
-                {winrateSubtext}
-              </div>
+              <div className="text-[10px] text-zinc-500 font-mono truncate">{winrateSubtext}</div>
             </div>
           </div>
         </div>
 
-        {/* 2. OVERALL METRICS */}
+        {/* Overall Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="p-3 rounded-2xl bg-[#09090b] border border-zinc-800/80">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>Серия дней</span>
+              <span>Серия</span>
             </div>
-            <div className="text-lg font-bold text-zinc-100 font-mono">
+            <div className="text-base font-bold text-zinc-100 font-mono tabular-nums">
               {getPluralDays(stats.streakDays || 1)}
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#09090b] border border-zinc-800/80">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
-              <Clock className="w-3.5 h-3.5 text-blue-400" />
-              <span>Всего время</span>
+              <Clock className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Время</span>
             </div>
-            <div className="text-lg font-bold text-zinc-100 font-mono truncate">
+            <div className="text-base font-bold text-zinc-100 font-mono tabular-nums truncate">
               {formatTime(stats.totalActiveSeconds)}
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#09090b] border border-zinc-800/80">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
               <Award className="w-3.5 h-3.5 text-emerald-400" />
               <span>Закреплено</span>
             </div>
-            <div className="text-lg font-bold text-zinc-100 font-mono">
-              {mastered100} <span className="text-xs text-zinc-500 font-normal">фраз</span>
+            <div className="text-base font-bold text-zinc-100 font-mono tabular-nums">
+              {masteredCount} <span className="text-xs text-zinc-500 font-normal">фраз</span>
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#09090b] border border-zinc-800/80">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
-              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+              <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
               <span>Словарь</span>
             </div>
-            <div className="text-lg font-bold text-zinc-100 font-mono">
+            <div className="text-base font-bold text-zinc-100 font-mono tabular-nums">
               {vocab.totalUniqueWords} <span className="text-xs text-zinc-500 font-normal">слов</span>
             </div>
           </div>
         </div>
 
-        {/* 3. ACTIVITY DYNAMICS (DECOMPOSED TO SEPARATE COMPONENT) */}
-        <ActivityChart
-          dailyHistory={stats.dailyHistory}
-          formatTime={formatTime}
-        />
+        {/* Activity Chart */}
+        <ActivityChart dailyHistory={stats.dailyHistory} formatTime={formatTime} />
 
-        {/* 4. CEFR LEVEL & VOCABULARY */}
-        <div className="p-4 rounded-2xl bg-[#09090b] border border-zinc-800/90 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Target className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="text-xs uppercase tracking-wider text-zinc-400 font-semibold">
-                  Твой уровень языка (CEFR)
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-zinc-100 font-mono tracking-tight">
-                  {vocab.currentLevel.level}
-                </span>
-                <span className="text-sm font-semibold text-zinc-300">
-                  {vocab.currentLevel.title}
-                </span>
-                <span className="text-xs text-zinc-500 hidden sm:inline">
-                  — {vocab.currentLevel.description}
-                </span>
-              </div>
+        {/* CEFR */}
+        <div className="p-4 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="text-xs font-semibold text-zinc-300">
+                Уровень: <strong className="text-zinc-100 font-mono">{vocab.currentLevel.level}</strong> ({vocab.currentLevel.title})
+              </span>
             </div>
-
-            <div className="text-left sm:text-right">
-              <div className="text-[11px] text-zinc-500">Выучено уникальных слов</div>
-              <div className="text-lg font-bold font-mono text-zinc-100">
-                {vocab.masteredWordsCount} <span className="text-xs text-zinc-500 font-normal">/ {vocab.totalUniqueWords}</span>
-              </div>
-            </div>
+            <span className="text-xs font-mono text-zinc-400 tabular-nums">
+              {vocab.masteredWordsCount} / {vocab.totalUniqueWords} слов
+            </span>
           </div>
 
           {vocab.nextLevel && (
-            <div className="space-y-1.5 pt-2 border-t border-zinc-850">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400">
-                  До уровня <strong>{vocab.nextLevel.level} ({vocab.nextLevel.title})</strong>:
-                </span>
-                <span className="font-mono text-zinc-300">
-                  ещё {vocab.wordsToNextLevel} слов ({vocab.progressPercent}%)
-                </span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                <span>До {vocab.nextLevel.level}: ещё {vocab.wordsToNextLevel} слов</span>
+                <span className="font-mono tabular-nums">{vocab.progressPercent}%</span>
               </div>
-              <div className="w-full h-1.5 rounded-full bg-zinc-850 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
                 <div
-                  className="h-full bg-zinc-300 rounded-full transition-all duration-500"
+                  className="h-full bg-zinc-400 rounded-full transition-all duration-500"
                   style={{ width: `${vocab.progressPercent}%` }}
                 />
               </div>
             </div>
           )}
         </div>
-
-        {/* 5. RECENT MASTERED WORDS */}
-        {vocab.recentWords.length > 0 && (
-          <div className="p-3.5 rounded-2xl bg-[#09090b] border border-zinc-800/80 space-y-2">
-            <div className="text-xs font-semibold text-zinc-400">
-              Слова, закрепленные в долговременной памяти:
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-              {vocab.recentWords.map(word => (
-                <span
-                  key={word}
-                  className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-300"
-                >
-                  {word}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex justify-end pt-1">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-zinc-200 hover:bg-zinc-100 text-zinc-950 text-xs font-medium cursor-pointer transition-colors"
-          >
-            Закрыть
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };

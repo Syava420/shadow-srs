@@ -132,7 +132,7 @@ export function parsePastedText(rawText: string): ImportPreviewItem[] {
 
       if (cleanA && cleanB) {
         const isA_Russian = isRussianText(cleanA);
-        let front = isA_Russian ? cleanA : cleanB;
+        const front = isA_Russian ? cleanA : cleanB;
         let back = isA_Russian ? cleanB : cleanA;
         let transcription = '';
 

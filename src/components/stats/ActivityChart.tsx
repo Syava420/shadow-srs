@@ -138,7 +138,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                   </span>
 
                   {/* Vertical bar slot */}
-                  <div className="w-full bg-zinc-850/80 rounded-md p-0.5 flex flex-col justify-end h-20">
+                  <div className="w-full bg-zinc-900 rounded-md p-0.5 flex flex-col justify-end h-20">
                     <div
                       style={{ height: `${heightPercent}%` }}
                       className={`w-full rounded-sm transition-all duration-300 ${

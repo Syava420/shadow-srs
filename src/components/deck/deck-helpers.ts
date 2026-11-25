@@ -68,7 +68,7 @@ export function computeStudyBatchComposition(
 }
 
 export type SortOption = 'due_first' | 'difficult_first' | 'mastery_asc' | 'mastery_desc' | 'time_spent' | 'newest' | 'alphabetical';
-export type FilterOption = 'all' | 'difficult';
+export type FilterOption = 'all' | 'due' | 'new' | 'difficult';
 
 export function filterAndSortCards(
   cards: FlashCard[],
@@ -78,10 +78,16 @@ export function filterAndSortCards(
 ): FlashCard[] {
   const query = searchQuery.trim().toLowerCase();
   
-  let result = cards.filter(card => {
+  const result = cards.filter(card => {
     if (query) {
       const match = card.front.toLowerCase().includes(query) || card.back.toLowerCase().includes(query);
       if (!match) return false;
+    }
+    if (filterMode === 'due') {
+      return isCardDue(card);
+    }
+    if (filterMode === 'new') {
+      return isCardNew(card);
     }
     if (filterMode === 'difficult') {
       return isCardDifficult(card);

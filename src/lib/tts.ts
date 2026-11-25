@@ -91,7 +91,9 @@ class TTSService {
         const data = await res.json();
         const phonetics = Array.isArray(data) ? data[0]?.phonetics : null;
         if (Array.isArray(phonetics)) {
-          const match = phonetics.find((p: any) => p.audio && p.audio.length > 0);
+          const match = phonetics.find(
+            (p: { audio?: string }) => typeof p?.audio === 'string' && p.audio.length > 0
+          );
           if (match?.audio) {
             audioUrl = match.audio;
             this.wordAudioCache.set(cleanWord, audioUrl!);
@@ -167,7 +169,7 @@ class TTSService {
     window.speechSynthesis.speak(utterance);
   }
 
-  public preload(text: string, options: TTSOptions = {}): void {
+  public preload(text: string): void {
     if (typeof window === 'undefined' || !text || !text.trim()) return;
     const cleanWord = text.trim().toLowerCase();
     if (/^[a-z]+$/i.test(cleanWord) && !this.wordAudioCache.has(cleanWord)) {

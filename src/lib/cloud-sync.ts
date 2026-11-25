@@ -47,6 +47,10 @@ export const cloudSync = {
     timestamp?: number,
     onProgress?: (percent: number) => void
   ): Promise<boolean> {
+    if (storage.isSandboxMode()) {
+      if (onProgress) onProgress(100);
+      return true;
+    }
     try {
       const now = timestamp || Date.now();
       storage.setLastUpdatedAt(now);
@@ -183,6 +187,9 @@ export const cloudSync = {
    * Performs timestamp-based synchronization with progress callback
    */
   async sync(onProgress?: (percent: number) => void): Promise<{ success: boolean; pulled: boolean; pushed: boolean }> {
+    if (storage.isSandboxMode()) {
+      return { success: true, pulled: false, pushed: false };
+    }
     try {
       const cloudData = await this.pullFromCloud(onProgress);
 
@@ -274,7 +281,7 @@ export const cloudSync = {
    * Suppresses own client echo to prevent UI freeze and redundant downloads.
    */
   subscribeToCloud(onDataChanged: () => void, isActivelyStudying?: () => boolean): () => void {
-    if (typeof window === 'undefined') return () => {};
+    if (typeof window === 'undefined' || storage.isSandboxMode()) return () => {};
 
     try {
       const metaRef = doc(db, 'shadow_srs', 'metadata');
